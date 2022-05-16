@@ -27,7 +27,7 @@ jobs:
             use_cross: true
             test: false
             # TODO: sort out build_donna feature / tests for thumbv7em
-            args: --no-default-features --features=u32_backend
+            args: --no-default-features --features=u32_backend,getrandom/custom
 
     steps:
     - uses: actions/checkout@v2
