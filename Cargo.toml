@@ -1,5 +1,6 @@
 [package]
 name = "dalek-donna"
+repository = "https://github.com/ryankurte/rust-dalek-donna"
 version = "0.1.0"
 edition = "2021"
 
