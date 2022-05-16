@@ -131,7 +131,8 @@ pub extern "C" fn dalek_ed25519_sign(m: *const u8, mlen: UInt, sk: *mut u8, pk: 
 }
 
 /// Batch verify signatures, valid[i] == 1 for valid, 0 otherwise
-// TODO: `ed25519-donna-batchverify.h` has -a lot- going on, presumably for performance reasons... need to understand and implement this
+// TODO: `ed25519-donna-batchverify.h` has -a lot- going on, presumably for performance reasons (see `cargo bench`)... need to understand and implement this
+// TODO: reverse engineer the error returns from the existing code
 pub extern "C" fn dalek_ed25519_sign_open_batch(m: *mut *const u8, mlen: *mut UInt, pk: *mut *const u8, rs: *mut *const u8, num: UInt, valid: *mut c_int) -> c_int {
     // Convert pointers into slices
     let (m, mlen, pk, rs, valid) = unsafe {(
