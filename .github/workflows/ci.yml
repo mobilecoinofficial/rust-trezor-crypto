@@ -11,7 +11,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-cross:
+  build:
 
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -64,5 +64,13 @@ jobs:
       with:
         use-cross: ${{ matrix.use_cross }}
         command: test
+        args: --target ${{ matrix.target }} ${{ matrix.args }}
+
+    - name: Benchmark
+      if: ${{ matrix.test }}
+      uses: actions-rs/cargo@v1
+      with:
+        use-cross: ${{ matrix.use_cross }}
+        command: bench
         args: --target ${{ matrix.target }} ${{ matrix.args }}
   
