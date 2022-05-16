@@ -104,8 +104,8 @@ fn batch_verify<const N: usize>(signer: &Driver, verifier: &Driver) {
         valid.as_mut_ptr()
     ) };
 
-    assert_eq!(res, 0);
-    assert_eq!(valid, [1; N]);
+    assert_eq!(res, 0, "Expected success");
+    assert_eq!(valid, [1; N], "Unexpected success flags");
 
 
     // Invalidate first message
@@ -122,14 +122,14 @@ fn batch_verify<const N: usize>(signer: &Driver, verifier: &Driver) {
         valid.as_mut_ptr()
     ) };
 
-    assert_eq!(res, 1);
+    assert!(res != 0, "expected failure");
     let mut expected = [1; N];
     expected[0] = 0;
-    assert_eq!(valid, expected);
+    assert_eq!(valid, expected, "unexpected failure flags");
 }
 
 // TODO: work out why donna fails with larger batch sizes
-const TEST_BATCH_SIZE: usize = 3;
+const TEST_BATCH_SIZE: usize = 16;
 
 #[test]
 fn batch_verify_donna_donna() {
