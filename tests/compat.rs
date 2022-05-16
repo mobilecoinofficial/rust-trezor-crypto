@@ -1,13 +1,17 @@
 #![feature(test)]
 
+use crate::UInt;
+
 extern crate test;
 
-use dalek_donna::{test::*, ffi::{PublicKey, SecretKey, Signature}};
+use dalek_donna::{test::*, ffi::{PublicKey, SecretKey}};
 
 /// Check key derivation functions match
 #[test]
 fn derive_keys() {
-    let sk: SecretKey = rand::random();
+    let mut sk: SecretKey = [0u8; 32];
+    getrandom::getrandom(&mut sk).unwrap();
+
     println!("Using secret key: {:02x?}", sk);
 
     // Perform dalek key derivation
@@ -28,27 +32,29 @@ fn derive_keys() {
 
 fn sign_verify(signer: &Driver, verifier: &Driver) {
     // Generate message
-    let m: [u8; 32] = rand::random();
+    let mut m = [0u8; 32];
+    getrandom::getrandom(&mut m).unwrap();
 
     // Generate keys
-    let mut sk: SecretKey = rand::random();
+    let mut sk: SecretKey = [0u8; 32];
+    getrandom::getrandom(&mut sk).unwrap();
     let mut pk: PublicKey = [0u8; 32];
     unsafe { (signer.publickey)(sk.as_mut_ptr(), pk.as_mut_ptr()) };
 
     let mut sig = [0u8; 64];
 
     // Sign using donna
-    unsafe { (signer.sign)(m.as_ptr(), m.len() as u64, sk.as_mut_ptr(), pk.as_mut_ptr(), sig.as_mut_ptr()) };
+    unsafe { (signer.sign)(m.as_ptr(), m.len() as UInt, sk.as_mut_ptr(), pk.as_mut_ptr(), sig.as_mut_ptr()) };
 
     // Verify using dalek
 
     // Check OK signature
-    let res = unsafe { (verifier.sign_open)(m.as_ptr(), m.len() as u64, pk.as_mut_ptr(), sig.as_mut_ptr()) };
+    let res = unsafe { (verifier.sign_open)(m.as_ptr(), m.len() as UInt, pk.as_mut_ptr(), sig.as_mut_ptr()) };
     assert_eq!(res, 0);
 
     // Check broken signature
     sig[0] ^= 0xFF;
-    let res = unsafe { (verifier.sign_open)(m.as_ptr(), m.len() as u64, pk.as_mut_ptr(), sig.as_mut_ptr()) };
+    let res = unsafe { (verifier.sign_open)(m.as_ptr(), m.len() as UInt, pk.as_mut_ptr(), sig.as_mut_ptr()) };
     assert!(res != 0);
 }
 
@@ -72,31 +78,6 @@ fn dalek_sign_donna_verify() {
     sign_verify(&DALEK, &DONNA);
 }
 
-type Message = [u8; 32];
-
-fn generate_batch<const N: usize>(signer: &Driver) -> [(SecretKey, PublicKey, Message, u64, Signature); N] {
-
-    let mut batch = [(
-        SecretKey::default(),
-        PublicKey::default(),
-        Message::default(),
-        32,
-        [0u8; 64],
-    ); N];
-
-    for i in 0..N {
-        // Generate keys
-        batch[i].0 = rand::random();
-        batch[i].1 = [0u8; 32];
-        unsafe { (signer.publickey)(batch[i].0.as_mut_ptr(), batch[i].1.as_mut_ptr()) };
-
-        // Generate and sign message
-        batch[i].2 = rand::random();
-        unsafe { (signer.sign)( batch[i].2.as_ptr(),  batch[i].3, batch[i].0.as_mut_ptr(), batch[i].1.as_mut_ptr(), batch[i].4.as_mut_ptr()) };
-    }
-
-    batch
-}
 
 fn batch_verify<const N: usize>(signer: &Driver, verifier: &Driver) {
     // Generate messages / keys / signatures
@@ -116,10 +97,10 @@ fn batch_verify<const N: usize>(signer: &Driver, verifier: &Driver) {
     // Valid good batch
     let res = unsafe { (verifier.sign_open_batch)(
         m.as_mut_ptr() as *mut *const u8, 
-        mlen.as_mut_ptr() as *mut u64, 
+        mlen.as_mut_ptr() as *mut UInt, 
         pk.as_mut_ptr() as *mut *const u8, 
         sigs.as_mut_ptr() as *mut *const u8,
-        N as u64,
+        N as UInt,
         valid.as_mut_ptr()
     ) };
 
@@ -134,10 +115,10 @@ fn batch_verify<const N: usize>(signer: &Driver, verifier: &Driver) {
     // Valid batch with error
     let res = unsafe { (verifier.sign_open_batch)(
         m.as_mut_ptr() as *mut *const u8, 
-        mlen.as_mut_ptr() as *mut u64, 
+        mlen.as_mut_ptr() as *mut UInt, 
         pk.as_mut_ptr() as *mut *const u8, 
         sigs.as_mut_ptr() as *mut *const u8,
-        N as u64,
+        N as UInt,
         valid.as_mut_ptr()
     ) };
 
@@ -169,45 +150,3 @@ fn batch_verify_donna_dalek() {
 fn batch_verify_dalek_donna() {
     batch_verify::<TEST_BATCH_SIZE>(&DALEK, &DONNA);
 }
-
-fn bench_batch_verify<const N: usize>(b: &mut test::Bencher, driver: &Driver) {
-    // Generate batch
-    // Generate messages / keys / signatures
-    let batch = generate_batch::<N>(driver);
-
-    // Remap into arrays of pointers
-    let mut pk: Vec<_> = batch.iter().map(|ref v| v.1.as_ptr() ).collect();
-    let mut m: Vec<_> = batch.iter().map(|ref v| v.2.as_ptr() ).collect();
-    let mut mlen: Vec<_> = batch.iter().map(|v| v.3).collect();
-    let mut sigs: Vec<_> = batch.iter().map(|ref mut v| v.4.as_ptr() ).collect();
-
-    b.iter(|| {
-        // Perform batch verification
-        let mut valid = [0; N];
-
-        let res = unsafe { (driver.sign_open_batch)(
-            m.as_mut_ptr() as *mut *const u8, 
-            mlen.as_mut_ptr() as *mut u64, 
-            pk.as_mut_ptr() as *mut *const u8, 
-            sigs.as_mut_ptr() as *mut *const u8,
-            N as u64,
-            valid.as_mut_ptr()
-        ) };
-
-        assert_eq!(res, 0);
-        assert_eq!(valid, [1; N]);
-    })
-}
-
-const BENCH_BATCH_SIZE: usize = 64;
-
-#[bench]
-fn bench_batch_verify_donna(b: &mut test::Bencher) {
-    bench_batch_verify::<BENCH_BATCH_SIZE>(b, &DONNA)
-}
-
-#[bench]
-fn bench_batch_verify_dalek(b: &mut test::Bencher) {
-    bench_batch_verify::<BENCH_BATCH_SIZE>(b, &DALEK)
-}
-

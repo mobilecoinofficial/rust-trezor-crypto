@@ -1,12 +1,14 @@
 //! Helpers to ensure ABI compatibility for use when testing
 
+pub use crate::UInt;
+
 /// Driver ABI for dalek or donna impls
 #[allow(unused)]
 pub struct Driver {
     pub publickey: unsafe extern "C" fn(*mut u8, *mut u8),
-    pub sign_open: unsafe extern "C" fn(*const u8, u64, *mut u8, *mut u8) -> i32,
-    pub sign: unsafe extern "C" fn(*const u8, u64, *mut u8, *mut u8, *mut u8),
-    pub sign_open_batch: unsafe extern "C" fn(*mut *const u8, *mut u64, *mut *const u8, *mut *const u8, u64, *mut i32) -> i32,
+    pub sign_open: unsafe extern "C" fn(*const u8, UInt, *mut u8, *mut u8) -> i32,
+    pub sign: unsafe extern "C" fn(*const u8, UInt, *mut u8, *mut u8, *mut u8),
+    pub sign_open_batch: unsafe extern "C" fn(*mut *const u8, *mut UInt, *mut *const u8, *mut *const u8, UInt, *mut i32) -> i32,
 }
 
 /// Donna driver implementation (using FFI)
@@ -26,8 +28,8 @@ pub const DALEK: Driver = Driver {
     sign_open_batch: crate::dalek_ed25519_sign_open_batch,
 };
 
-#[cfg(feature = "std")]
-pub fn generate_batch<const N: usize>(signer: &Driver) -> [([u8; 32], [u8; 32], [u8; 128], u64, [u8; 64]); N] {
+
+pub fn generate_batch<const N: usize>(signer: &Driver) -> [([u8; 32], [u8; 32], [u8; 128], UInt, [u8; 64]); N] {
 
     let mut batch = [(
         [0u8; 32],
@@ -39,12 +41,12 @@ pub fn generate_batch<const N: usize>(signer: &Driver) -> [([u8; 32], [u8; 32], 
 
     for i in 0..N {
         // Generate keys
-        batch[i].0 = rand::random();
+        getrandom::getrandom(&mut batch[i].0).unwrap();
         batch[i].1 = [0u8; 32];
         unsafe { (signer.publickey)(batch[i].0.as_mut_ptr(), batch[i].1.as_mut_ptr()) };
 
         // Generate and sign message
-        batch[i].2.iter_mut().for_each(|v| *v = rand::random() );
+        getrandom::getrandom(&mut batch[i].2).unwrap();
         unsafe { (signer.sign)( batch[i].2.as_ptr(),  batch[i].3, batch[i].0.as_mut_ptr(), batch[i].1.as_mut_ptr(), batch[i].4.as_mut_ptr()) };
     }
 

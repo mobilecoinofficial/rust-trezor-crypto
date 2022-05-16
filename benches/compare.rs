@@ -24,7 +24,7 @@ fn bench_batch_verify<const N: usize>(b: &mut test::Bencher, driver: &Driver) {
 
         let res = unsafe { (driver.sign_open_batch)(
             m.as_mut_ptr() as *mut *const u8, 
-            mlen.as_mut_ptr() as *mut u64, 
+            mlen.as_mut_ptr() as *mut UInt, 
             pk.as_mut_ptr() as *mut *const u8, 
             sigs.as_mut_ptr() as *mut *const u8,
             N as u64,

@@ -5,20 +5,20 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-std = [ "curve25519-dalek/std", "ed25519-dalek/std", "x25519-dalek/std", "rand" ]
-u32_backend = [ "curve25519-dalek/u32_backend", "ed25519-dalek/u32_backend", "x25519-dalek/u32_backend" ]
+std = [ ]
+u32_backend = [ "ed25519-dalek/u32_backend" ]
 build_donna = []
 
 default = [ "std", "u32_backend", "build_donna" ]
 
 [dependencies]
 cty = "0.2.2"
-rand = { version = "0.8.5", optional = true }
-getrandom = { version = "0.2.6", default_features = false, features = [ "custom" ] }
+getrandom = { version = "0.2.6", default_features = false }
+sha2 = { version = "*", default_features = false }
 
-curve25519-dalek = { version = "3.2.1", default_features = false }
+#curve25519-dalek = { version = "3.2.1", default_features = false }
 ed25519-dalek = { version = "1.0.1", default_features = false }
-x25519-dalek = { version = "1.2.0", default_features = false }
+#x25519-dalek = { version = "1.2.0", default_features = false }
 
 [build-dependencies]
 bindgen = "0.59.2"
@@ -26,5 +26,6 @@ anyhow = "1.0.57"
 cc = "1.0.73"
 glob = "0.3.0"
 
-[dev-dependencies]
-rand = { version = "0.8.5", features = [ "std" ]}
+[patch.crates-io]
+#curve25519-dalek = { git = "https://github.com/dalek-cryptography/curve25519-dalek" }
+#ed25519-dalek = { git = "https://github.com/dalek-cryptography/ed25519-dalek" }

@@ -5,13 +5,27 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use cty::{size_t, c_int};
+use cty::c_int;
+
 use ed25519_dalek::{Signer, Verifier, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SIGNATURE_LENGTH};
 
 #[cfg(feature = "build_donna")]
 pub mod ffi;
 
 pub mod test;
+
+
+// Bindgen / cty have some weird behaviours when mapping `size_t` on different platforms.
+// use [`Uint`] in place of `cty::size_t` to avoid this.
+
+/// Alias for size_t on 32-bit platforms where size_t is c_uint
+#[cfg(target_pointer_width="32")]
+pub type UInt = cty::c_uint;
+
+/// Alias for size_t on 64-bit platforms where size_t is c_ulong
+#[cfg(target_pointer_width="64")]
+pub type UInt = cty::uint64_t;
+
 
 /// Derives a public key from a private key
 /// 
@@ -44,7 +58,7 @@ pub extern "C" fn dalek_ed25519_publickey(sk: *mut u8, pk: *mut u8) {
 /// Verifies a signed message
 /// 
 /// Compatible with ed25519-donna [ed25519_sign_open](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L94)
-pub extern "C" fn dalek_ed25519_sign_open(m: *const u8, mlen: u64, pk: *mut u8, sig: *mut u8) -> c_int {
+pub extern "C" fn dalek_ed25519_sign_open(m: *const u8, mlen: UInt, pk: *mut u8, sig: *mut u8) -> c_int {
     // Convert pointers into slices
     let (m, pk, sig) = unsafe {(
         core::slice::from_raw_parts(m, mlen as usize),
@@ -77,7 +91,7 @@ pub extern "C" fn dalek_ed25519_sign_open(m: *const u8, mlen: u64, pk: *mut u8, 
 /// Signs a message using the provided secret key
 /// 
 /// Compatible with ed25519-donna [ed25519_sign](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L59)
-pub extern "C" fn dalek_ed25519_sign(m: *const u8, mlen: u64, sk: *mut u8, pk: *mut u8, sig: *mut u8) {
+pub extern "C" fn dalek_ed25519_sign(m: *const u8, mlen: UInt, sk: *mut u8, pk: *mut u8, sig: *mut u8) {
     // Convert pointers into slices
     let (m, sk, pk, sig) = unsafe {(
         core::slice::from_raw_parts(m, mlen as usize),
@@ -118,7 +132,7 @@ pub extern "C" fn dalek_ed25519_sign(m: *const u8, mlen: u64, sk: *mut u8, pk: *
 
 /// Batch verify signatures, valid[i] == 1 for valid, 0 otherwise
 // TODO: `ed25519-donna-batchverify.h` has -a lot- going on, presumably for performance reasons... need to understand and implement this
-pub extern "C" fn dalek_ed25519_sign_open_batch(m: *mut *const u8, mlen: *mut u64, pk: *mut *const u8, rs: *mut *const u8, num: u64, valid: *mut c_int) -> c_int {
+pub extern "C" fn dalek_ed25519_sign_open_batch(m: *mut *const u8, mlen: *mut UInt, pk: *mut *const u8, rs: *mut *const u8, num: UInt, valid: *mut c_int) -> c_int {
     // Convert pointers into slices
     let (m, mlen, pk, rs, valid) = unsafe {(
         core::slice::from_raw_parts(m, num as usize),
@@ -149,11 +163,13 @@ pub extern "C" fn dalek_ed25519_sign_open_batch(m: *mut *const u8, mlen: *mut u6
 }
 
 /// Generate random bytes using the system RNG
-pub extern "C" fn dalek_ed25519_randombytes_unsafe(out: *mut u8, count: size_t) {
+pub extern "C" fn dalek_ed25519_randombytes_unsafe(out: *mut u8, count: UInt) {
     let buff = unsafe { core::slice::from_raw_parts_mut(out, count as usize) };
     let _ = getrandom::getrandom(buff);
 }
 
+/// TODO: this
 pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut u8, e: *const u8) {
     todo!()
 }
+
