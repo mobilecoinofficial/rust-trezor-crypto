@@ -22,7 +22,7 @@ fn bench_batch_verify<const N: usize>(b: &mut test::Bencher, driver: &Driver) {
         // Perform batch verification
         let mut valid = [0; N];
 
-        let res = unsafe { (driver.sign_open_batch)(
+        let res = unsafe { (driver.ed25519_sign_open_batch)(
             m.as_mut_ptr() as *mut *const u8, 
             mlen.as_mut_ptr() as *mut UInt, 
             pk.as_mut_ptr() as *mut *const u8, 
