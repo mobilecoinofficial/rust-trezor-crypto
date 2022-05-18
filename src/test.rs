@@ -5,31 +5,31 @@ pub use crate::UInt;
 /// Driver ABI for dalek or donna impls
 #[allow(unused)]
 pub struct Driver {
-    pub publickey: unsafe extern "C" fn(*mut u8, *mut u8),
-    pub sign: unsafe extern "C" fn(*const u8, UInt, *mut u8, *mut u8, *mut u8),
-    pub sign_open: unsafe extern "C" fn(*const u8, UInt, *mut u8, *mut u8) -> i32,
-    pub sign_open_batch: unsafe extern "C" fn(*mut *const u8, *mut UInt, *mut *const u8, *mut *const u8, UInt, *mut i32) -> i32,
+    pub ed25519_publickey: unsafe extern "C" fn(*mut u8, *mut u8),
+    pub ed25519_sign: unsafe extern "C" fn(*const u8, UInt, *mut u8, *mut u8, *mut u8),
+    pub ed25519_sign_open: unsafe extern "C" fn(*const u8, UInt, *mut u8, *mut u8) -> i32,
+    pub ed25519_sign_open_batch: unsafe extern "C" fn(*mut *const u8, *mut UInt, *mut *const u8, *mut *const u8, UInt, *mut i32) -> i32,
 
-    pub scalarmult_basepoint: unsafe extern "C" fn(*mut u8, *mut u8),
+    pub curve25519_scalarmult_basepoint: unsafe extern "C" fn(*mut u8, *mut u8),
 }
 
 /// Donna driver implementation (using FFI)
 #[cfg(feature = "build_donna")]
 pub const DONNA: Driver = Driver {
-    publickey: crate::ffi::ed25519_publickey,
-    sign_open: crate::ffi::ed25519_sign_open,
-    sign: crate::ffi::ed25519_sign,
-    sign_open_batch: crate::ffi::ed25519_sign_open_batch,
-    scalarmult_basepoint: crate::ffi::curved25519_scalarmult_basepoint
+    ed25519_publickey: crate::ffi::ed25519_publickey,
+    ed25519_sign_open: crate::ffi::ed25519_sign_open,
+    ed25519_sign: crate::ffi::ed25519_sign,
+    ed25519_sign_open_batch: crate::ffi::ed25519_sign_open_batch,
+    curve25519_scalarmult_basepoint: crate::ffi::curved25519_scalarmult_basepoint
 };
 
 /// Dalek driver implementation (native rust)
 pub const DALEK: Driver = Driver {
-    publickey: crate::dalek_ed25519_publickey,
-    sign_open: crate::dalek_ed25519_sign_open,
-    sign: crate::dalek_ed25519_sign,
-    sign_open_batch: crate::dalek_ed25519_sign_open_batch,
-    scalarmult_basepoint: crate::dalek_curved25519_scalarmult_basepoint,
+    ed25519_publickey: crate::dalek_ed25519_publickey,
+    ed25519_sign_open: crate::dalek_ed25519_sign_open,
+    ed25519_sign: crate::dalek_ed25519_sign,
+    ed25519_sign_open_batch: crate::dalek_ed25519_sign_open_batch,
+    curve25519_scalarmult_basepoint: crate::dalek_curved25519_scalarmult_basepoint,
 };
 
 
@@ -47,11 +47,11 @@ pub fn generate_batch<const N: usize>(signer: &Driver) -> [([u8; 32], [u8; 32], 
         // Generate keys
         getrandom::getrandom(&mut batch[i].0).unwrap();
         batch[i].1 = [0u8; 32];
-        unsafe { (signer.publickey)(batch[i].0.as_mut_ptr(), batch[i].1.as_mut_ptr()) };
+        unsafe { (signer.ed25519_publickey)(batch[i].0.as_mut_ptr(), batch[i].1.as_mut_ptr()) };
 
         // Generate and sign message
         getrandom::getrandom(&mut batch[i].2).unwrap();
-        unsafe { (signer.sign)( batch[i].2.as_ptr(),  batch[i].3, batch[i].0.as_mut_ptr(), batch[i].1.as_mut_ptr(), batch[i].4.as_mut_ptr()) };
+        unsafe { (signer.ed25519_sign)( batch[i].2.as_ptr(),  batch[i].3, batch[i].0.as_mut_ptr(), batch[i].1.as_mut_ptr(), batch[i].4.as_mut_ptr()) };
     }
 
     batch

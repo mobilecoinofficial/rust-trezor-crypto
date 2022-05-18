@@ -18,13 +18,13 @@ fn derive_keys() {
     // Perform dalek key derivation
     let mut dalek_sk = sk.clone();
     let mut dalek_pk: PublicKey = [0u8; 32];
-    unsafe { (DALEK.publickey)(dalek_sk.as_mut_ptr(), dalek_pk.as_mut_ptr()) };
+    unsafe { (DALEK.ed25519_publickey)(dalek_sk.as_mut_ptr(), dalek_pk.as_mut_ptr()) };
     assert_eq!(dalek_sk, sk);
 
     // Perform donna key derivation
     let mut donna_sk = sk.clone();
     let mut donna_pk: PublicKey = [0u8; 32];
-    unsafe { (DONNA.publickey)(donna_sk.as_mut_ptr(), donna_pk.as_mut_ptr()) };
+    unsafe { (DONNA.ed25519_publickey)(donna_sk.as_mut_ptr(), donna_pk.as_mut_ptr()) };
     assert_eq!(donna_sk, sk);
     
     // Compare results
@@ -40,22 +40,22 @@ fn sign_verify(signer: &Driver, verifier: &Driver) {
     let mut sk: SecretKey = [0u8; 32];
     getrandom::getrandom(&mut sk).unwrap();
     let mut pk: PublicKey = [0u8; 32];
-    unsafe { (signer.publickey)(sk.as_mut_ptr(), pk.as_mut_ptr()) };
+    unsafe { (signer.ed25519_publickey)(sk.as_mut_ptr(), pk.as_mut_ptr()) };
 
     let mut sig = [0u8; 64];
 
     // Sign using donna
-    unsafe { (signer.sign)(m.as_ptr(), m.len() as UInt, sk.as_mut_ptr(), pk.as_mut_ptr(), sig.as_mut_ptr()) };
+    unsafe { (signer.ed25519_sign)(m.as_ptr(), m.len() as UInt, sk.as_mut_ptr(), pk.as_mut_ptr(), sig.as_mut_ptr()) };
 
     // Verify using dalek
 
     // Check OK signature
-    let res = unsafe { (verifier.sign_open)(m.as_ptr(), m.len() as UInt, pk.as_mut_ptr(), sig.as_mut_ptr()) };
+    let res = unsafe { (verifier.ed25519_sign_open)(m.as_ptr(), m.len() as UInt, pk.as_mut_ptr(), sig.as_mut_ptr()) };
     assert_eq!(res, 0);
 
     // Check broken signature
     sig[0] ^= 0xFF;
-    let res = unsafe { (verifier.sign_open)(m.as_ptr(), m.len() as UInt, pk.as_mut_ptr(), sig.as_mut_ptr()) };
+    let res = unsafe { (verifier.ed25519_sign_open)(m.as_ptr(), m.len() as UInt, pk.as_mut_ptr(), sig.as_mut_ptr()) };
     assert!(res != 0);
 }
 
@@ -96,7 +96,7 @@ fn batch_verify<const N: usize>(signer: &Driver, verifier: &Driver) {
 
 
     // Valid good batch
-    let res = unsafe { (verifier.sign_open_batch)(
+    let res = unsafe { (verifier.ed25519_sign_open_batch)(
         m.as_mut_ptr() as *mut *const u8, 
         mlen.as_mut_ptr() as *mut UInt, 
         pk.as_mut_ptr() as *mut *const u8, 
@@ -114,7 +114,7 @@ fn batch_verify<const N: usize>(signer: &Driver, verifier: &Driver) {
     unsafe { (*d) ^= 0xFF };
 
     // Valid batch with error
-    let res = unsafe { (verifier.sign_open_batch)(
+    let res = unsafe { (verifier.ed25519_sign_open_batch)(
         m.as_mut_ptr() as *mut *const u8, 
         mlen.as_mut_ptr() as *mut UInt, 
         pk.as_mut_ptr() as *mut *const u8, 
@@ -167,12 +167,12 @@ fn scalarmult() {
 
         let mut dalek_s = [0u8; 32];
         unsafe {
-            (DALEK.scalarmult_basepoint)(dalek_s.as_mut_ptr(), s.as_mut_ptr());
+            (DALEK.curve25519_scalarmult_basepoint)(dalek_s.as_mut_ptr(), s.as_mut_ptr());
         }
 
         let mut donna_s = [0u8; 32];
         unsafe {
-            (DONNA.scalarmult_basepoint)(donna_s.as_mut_ptr(), s.as_mut_ptr());
+            (DONNA.curve25519_scalarmult_basepoint)(donna_s.as_mut_ptr(), s.as_mut_ptr());
         }
 
         assert_eq!(dalek_s, donna_s);
