@@ -6,9 +6,11 @@ pub use crate::UInt;
 #[allow(unused)]
 pub struct Driver {
     pub publickey: unsafe extern "C" fn(*mut u8, *mut u8),
-    pub sign_open: unsafe extern "C" fn(*const u8, UInt, *mut u8, *mut u8) -> i32,
     pub sign: unsafe extern "C" fn(*const u8, UInt, *mut u8, *mut u8, *mut u8),
+    pub sign_open: unsafe extern "C" fn(*const u8, UInt, *mut u8, *mut u8) -> i32,
     pub sign_open_batch: unsafe extern "C" fn(*mut *const u8, *mut UInt, *mut *const u8, *mut *const u8, UInt, *mut i32) -> i32,
+
+    pub scalarmult_basepoint: unsafe extern "C" fn(*mut u8, *mut u8),
 }
 
 /// Donna driver implementation (using FFI)
@@ -18,6 +20,7 @@ pub const DONNA: Driver = Driver {
     sign_open: crate::ffi::ed25519_sign_open,
     sign: crate::ffi::ed25519_sign,
     sign_open_batch: crate::ffi::ed25519_sign_open_batch,
+    scalarmult_basepoint: crate::ffi::curved25519_scalarmult_basepoint
 };
 
 /// Dalek driver implementation (native rust)
@@ -26,6 +29,7 @@ pub const DALEK: Driver = Driver {
     sign_open: crate::dalek_ed25519_sign_open,
     sign: crate::dalek_ed25519_sign,
     sign_open_batch: crate::dalek_ed25519_sign_open_batch,
+    scalarmult_basepoint: crate::dalek_curved25519_scalarmult_basepoint,
 };
 
 

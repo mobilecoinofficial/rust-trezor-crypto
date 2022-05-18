@@ -4,6 +4,7 @@ use crate::UInt;
 
 extern crate test;
 
+use curve25519_dalek::scalar::Scalar;
 use dalek_donna::{test::*, ffi::{PublicKey, SecretKey}};
 
 /// Check key derivation functions match
@@ -149,4 +150,33 @@ fn batch_verify_donna_dalek() {
 #[test]
 fn batch_verify_dalek_donna() {
     batch_verify::<TEST_BATCH_SIZE>(&DALEK, &DONNA);
+}
+
+#[test]
+fn scalarmult() {
+    let mut rng = rand_core::OsRng;
+
+    let scalars = &[
+        Scalar::zero(),
+        Scalar::one(),
+        Scalar::random(&mut rng),
+    ];
+
+    for s in scalars {
+        let mut s = s.as_bytes().to_vec();
+
+        let mut dalek_s = [0u8; 32];
+        unsafe {
+            (DALEK.scalarmult_basepoint)(dalek_s.as_mut_ptr(), s.as_mut_ptr());
+        }
+
+        let mut donna_s = [0u8; 32];
+        unsafe {
+            (DONNA.scalarmult_basepoint)(donna_s.as_mut_ptr(), s.as_mut_ptr());
+        }
+
+        assert_eq!(dalek_s, donna_s);
+    }
+
+    
 }

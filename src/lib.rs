@@ -8,6 +8,7 @@
 use cty::c_int;
 
 use ed25519_dalek::{Signer, Verifier, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SIGNATURE_LENGTH};
+use curve25519_dalek::{scalar::Scalar, constants::ED25519_BASEPOINT_TABLE};
 
 #[cfg(feature = "build_donna")]
 pub mod ffi;
@@ -29,7 +30,8 @@ pub type UInt = cty::uint64_t;
 
 /// Derives a public key from a private key
 /// 
-/// Compatible with ed25519-donna [ed25519_publickey](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L45) 
+/// Compatible with ed25519-donna [ed25519_publickey](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L45)
+#[no_mangle]
 pub extern "C" fn dalek_ed25519_publickey(sk: *mut u8, pk: *mut u8) {
     // Convert pointers to slices
     let (sk, pk) = unsafe {
@@ -58,6 +60,7 @@ pub extern "C" fn dalek_ed25519_publickey(sk: *mut u8, pk: *mut u8) {
 /// Verifies a signed message
 /// 
 /// Compatible with ed25519-donna [ed25519_sign_open](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L94)
+#[no_mangle]
 pub extern "C" fn dalek_ed25519_sign_open(m: *const u8, mlen: UInt, pk: *mut u8, sig: *mut u8) -> c_int {
     // Convert pointers into slices
     let (m, pk, sig) = unsafe {(
@@ -91,6 +94,7 @@ pub extern "C" fn dalek_ed25519_sign_open(m: *const u8, mlen: UInt, pk: *mut u8,
 /// Signs a message using the provided secret key
 /// 
 /// Compatible with ed25519-donna [ed25519_sign](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L59)
+#[no_mangle]
 pub extern "C" fn dalek_ed25519_sign(m: *const u8, mlen: UInt, sk: *mut u8, pk: *mut u8, sig: *mut u8) {
     // Convert pointers into slices
     let (m, sk, pk, sig) = unsafe {(
@@ -131,8 +135,10 @@ pub extern "C" fn dalek_ed25519_sign(m: *const u8, mlen: UInt, sk: *mut u8, pk: 
 }
 
 /// Batch verify signatures, valid[i] == 1 for valid, 0 otherwise
-// TODO: `ed25519-donna-batchverify.h` has -a lot- going on, presumably for performance reasons (see `cargo bench`)... need to understand and implement this
-// TODO: reverse engineer the error returns from the existing code
+// TODO(@ryankurte): `ed25519-donna-batchverify.h` has -a lot- going on, presumably for performance reasons (see `cargo bench`)...
+// seems like [`ed25519_dalek::verify_batch`] could substitute but we still need to return the *valid values per message
+// TODO(@ryankurte): reverse engineer the error returns from the existing code
+#[no_mangle]
 pub extern "C" fn dalek_ed25519_sign_open_batch(m: *mut *const u8, mlen: *mut UInt, pk: *mut *const u8, rs: *mut *const u8, num: UInt, valid: *mut c_int) -> c_int {
     // Convert pointers into slices
     let (m, mlen, pk, rs, valid) = unsafe {(
@@ -164,13 +170,42 @@ pub extern "C" fn dalek_ed25519_sign_open_batch(m: *mut *const u8, mlen: *mut UI
 }
 
 /// Generate random bytes using the system RNG
+// TODO(@ryankurte): possible we don't need this
+#[no_mangle]
 pub extern "C" fn dalek_ed25519_randombytes_unsafe(out: *mut u8, count: UInt) {
     let buff = unsafe { core::slice::from_raw_parts_mut(out, count as usize) };
     let _ = getrandom::getrandom(buff);
 }
 
-/// TODO: this
-pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut u8, e: *const u8) {
-    todo!()
-}
+/// Perform scalar multiplication of `e` over the edwards curve point
+/// 
+/// Compatible with ed25519-donna [curved25519_scalarmult_basepoint](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L125)
+#[no_mangle]
+pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut u8, e: *mut u8) {
+    let (pk, e) = unsafe {(
+        core::slice::from_raw_parts_mut(pk, 32),
+        core::slice::from_raw_parts(e, 32),
+    )};
 
+    // Copy into editable slice
+    let mut ec = [0u8; 32];
+    ec.copy_from_slice(e);
+
+    // Clamp
+    ec[0] &= 248;
+    ec[31] &= 127;
+    ec[31] |= 64;    
+
+    // Expand basepoint
+    let s = Scalar::from_bytes_mod_order(ec);
+
+    // scalar * basepoint
+    let p = &ED25519_BASEPOINT_TABLE * &s;
+
+    // convert to montgomery
+    /* u = (y + z) / (z - y) */
+    let u = p.to_montgomery();
+
+    // Write back to pk
+    pk.copy_from_slice(u.as_bytes());
+}
