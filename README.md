@@ -1,6 +1,6 @@
 # trezor-crypto-lib
 
-A [dalek cryptography](https://github.com/dalek-cryptography/) based implementation of the [ed25519-donna](https://github.com/floodyberry/ed25519-donna) C APIs.
+A rust implementation of the [trezor-crypto]() C APIs based on [dalek cryptography](https://github.com/dalek-cryptography/).
 
 ## Status
 
