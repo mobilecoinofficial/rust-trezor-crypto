@@ -34,8 +34,8 @@ cc = "1.0.73"
 glob = "0.3.0"
 
 [dev-dependencies]
+libc = "0.2.126"
 rand_core = { version = "0.5.1", features = [ "std" ] }
-libc = "*"
 
 [patch.crates-io]
 #curve25519-dalek = { git = "https://github.com/dalek-cryptography/curve25519-dalek" }
