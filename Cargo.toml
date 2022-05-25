@@ -13,7 +13,7 @@ license = "BSD-3-Clause"
 
 [features]
 std = [ ]
-u32_backend = [ "ed25519-dalek/u32_backend", "curve25519-dalek/u32_backend" ]
+u32_backend = [ "ed25519-dalek/u32_backend", "curve25519-dalek/u32_backend", "x25519-dalek/u32_backend" ]
 build_donna = []
 
 default = [ "std", "u32_backend", "build_donna" ]
@@ -25,7 +25,7 @@ sha2 = { version = "*", default_features = false }
 
 curve25519-dalek = { version = "3.2.1", default_features = false }
 ed25519-dalek = { version = "1.0.1", default_features = false }
-#x25519-dalek = { version = "1.2.0", default_features = false }
+x25519-dalek = { version = "1.2.0", default_features = false }
 
 [build-dependencies]
 bindgen = "0.59.2"
@@ -34,6 +34,7 @@ cc = "1.0.73"
 glob = "0.3.0"
 
 [dev-dependencies]
+base64 = "0.13.0"
 libc = "0.2.126"
 rand_core = { version = "0.5.1", features = [ "std" ] }
 

@@ -13,6 +13,7 @@ use curve25519_dalek::{constants::ED25519_BASEPOINT_TABLE};
 #[cfg(feature = "build_donna")]
 pub mod ffi;
 
+#[cfg(feature = "build_donna")]
 pub mod test;
 
 
@@ -214,36 +215,56 @@ pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut Scalar, e: *mu
 
 /// Scalar multiplication using the provided basepoint
 #[no_mangle]
-pub extern "C" fn dalek_curve25519_scalarmult(pk: *mut PublicKey, e: *mut SecretKey, bp: *mut Scalar) {
-    let (pk, e, bp) = unsafe {( &mut (*pk), &(*e), &(*bp) )};
+pub extern "C" fn dalek_curve25519_scalarmult(o: *mut PublicKey, e: *mut SecretKey, bp: *mut PublicKey) {
+    let (o, e, bp) = unsafe {( &mut (*o), &(*e), &(*bp) )};
 
     // Copy secret into editable slice
     let mut ec = [0u8; 32];
     ec.copy_from_slice(e);
 
-    // Clamp
+    let mut bpc = [0u8; 32];
+    bpc.copy_from_slice(bp);
+
+    // Clamp secret key and expand
     ec[0] &= 248;
     ec[31] &= 127;
     ec[31] |= 64;
 
-    // Expand secret
-    let s = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(ec);
+    let secret = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(ec.clone());
 
-    // Load basepoint
-    let mut basepoint = [0u8; 32];
-    basepoint.copy_from_slice(bp);
-
-    let basepoint = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(basepoint);
+    let basepoint = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(bpc.clone());
 
     // Perform multiplication
-    let p = ED25519_BASEPOINT_TABLE.basepoint_mul(&basepoint) * &s;
+    // TODO: work out what this is -meant- to be doing
 
-    // convert to montgomery
-    /* u = (y + z) / (z - y) */
-    let u = p.to_montgomery();
+    #[cfg(nope)]
+    let p = {
+        let p = &ED25519_BASEPOINT_TABLE.basepoint_mul(&basepoint) * &secret;
+        p.to_montgomery().to_bytes()
+    };
+
+    #[cfg(nope)]
+    let p = {
+        let p = &ED25519_BASEPOINT_TABLE * &secret * &basepoint;
+        p.to_montgomery().to_bytes()
+    };
+
+    #[cfg(nope)]
+    let p = {
+        let shared = x25519_dalek::StaticSecret::from(ec.clone());
+        let public = x25519_dalek::PublicKey::from(bpc.clone());
+
+        let x = shared.diffie_hellman(&public);
+        x.to_bytes()
+    };
+
+    //#[cfg(nope)]
+    let p = {
+        x25519_dalek::x25519(ec, bpc)
+    };
 
     // Write back to pk
-    pk.copy_from_slice(u.as_bytes());
+    o.copy_from_slice(&p);
 
 }
 

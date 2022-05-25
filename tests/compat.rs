@@ -360,3 +360,65 @@ fn sign_ext_donna_dalek() {
     sign_ext(&DALEK, &DONNA);
 }
 
+#[test]
+fn curve25519_scalarmult_communicative() {
+
+    let (mut sk1, mut sk2) = ([0u8; 32], [0u8; 32]);
+    getrandom::getrandom(&mut sk1).unwrap();
+    getrandom::getrandom(&mut sk2).unwrap();
+
+    let mut pk1 = [0u8; 32];
+    unsafe { (DALEK.ed25519_publickey)(
+        pk1.as_mut_ptr() as *mut PublicKey,
+        sk1.as_mut_ptr() as *mut SecretKey,    
+    )};
+
+    let mut pk2 = [0u8; 32];
+    unsafe { (DALEK.ed25519_publickey)(
+        pk2.as_mut_ptr() as *mut PublicKey,
+        sk2.as_mut_ptr() as *mut SecretKey,    
+    )};
+
+    let mut s1 = [0u8; 32];
+    unsafe { (DALEK.curve25519_scalarmult)(
+        s1.as_mut_ptr() as *mut Scalar,
+        sk1.as_mut_ptr() as *mut SecretKey,
+        pk2.as_mut_ptr() as *mut PublicKey,    
+    )};
+
+    let mut s2 = [0u8; 32];
+    unsafe { (DALEK.curve25519_scalarmult)(
+        s2.as_mut_ptr() as *mut Scalar,
+        sk2.as_mut_ptr() as *mut SecretKey,
+        pk1.as_mut_ptr() as *mut PublicKey,    
+    )};
+
+    assert_eq!(s1, s2);
+
+}
+
+
+// Vectors from `test_trezor.crypto.curve.curve25519.py`
+const SCALARMULT_VECS: (&str, &str, &str) = (
+    "38c9d9b17911de26ed812f5cc19c0029e8d016bcbc6078bc9db2af33f1761e4a",
+    "311b6248af8dabec5cc81eac5bf229925f6d218a12e0547fb1856e015cc76f5d", "a93dbdb23e5c99da743e203bd391af79f2b83fb8d0fd6ec813371c71f08f2d4d",
+);
+
+#[test]
+fn curve25519_scalarmult_vectors() {
+
+    let (mut sk, mut pk, mut sess) = ([0u8; 64], [0u8; 64], [0u8; 64]);
+    
+    base64::decode_config_slice(SCALARMULT_VECS.0, base64::STANDARD, &mut sk).unwrap();
+    base64::decode_config_slice(SCALARMULT_VECS.1, base64::STANDARD, &mut pk).unwrap();
+    base64::decode_config_slice(SCALARMULT_VECS.2, base64::STANDARD, &mut sess).unwrap();
+
+    let mut sess2 = [0u8; 64];
+    unsafe { (DALEK.curve25519_scalarmult)(
+        sess2.as_mut_ptr() as *mut Scalar,
+        sk.as_mut_ptr() as *mut SecretKey,
+        pk.as_mut_ptr() as *mut PublicKey,
+    )};
+
+    assert_eq!(&sess[..32], &sess2[..32])
+}
