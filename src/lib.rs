@@ -1,14 +1,14 @@
 //! A dalek cryptography based reproduction of the ed25519-donna API
-//! 
-//! See: 
+//!
+//! See:
 //!   - https://github.com/ryankurte/rust-dalek-donna
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use cty::c_int;
 
-use ed25519_dalek::{Signer, Verifier, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SIGNATURE_LENGTH};
-use curve25519_dalek::{constants::ED25519_BASEPOINT_TABLE};
+use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
+use ed25519_dalek::{Signer, Verifier};
 
 #[cfg(feature = "build_donna")]
 pub mod ffi;
@@ -16,28 +16,46 @@ pub mod ffi;
 #[cfg(feature = "build_donna")]
 pub mod test;
 
+// Constant lengths
+pub mod consts {
+    pub const PUBLIC_KEY_LENGTH: usize = 32;
+    pub const SECRET_KEY_LENGTH: usize = 32;
+    pub const SIGNATURE_LENGTH: usize = 64;
+    pub const SCALAR_LENGTH: usize = 32;
+
+    // Ensure object sizes used here (and in FFI) match
+    static_assertions::const_assert_eq!(PUBLIC_KEY_LENGTH, ed25519_dalek::PUBLIC_KEY_LENGTH);
+    static_assertions::const_assert_eq!(SECRET_KEY_LENGTH, ed25519_dalek::SECRET_KEY_LENGTH);
+    static_assertions::const_assert_eq!(SIGNATURE_LENGTH, ed25519_dalek::SIGNATURE_LENGTH);
+}
+
+use crate::consts::*;
 
 // Bindgen / cty have some weird behaviours when mapping `size_t` on different platforms.
 // use [`Uint`] in place of `cty::size_t` to avoid this.
 
 /// Alias for size_t on 32-bit platforms where size_t is c_uint
-#[cfg(target_pointer_width="32")]
+#[cfg(target_pointer_width = "32")]
 pub type UInt = cty::c_uint;
 
 /// Alias for size_t on 64-bit platforms where size_t is c_ulong
-#[cfg(target_pointer_width="64")]
+#[cfg(target_pointer_width = "64")]
 pub type UInt = cty::uint64_t;
 
+/// PublicKey array
+pub type PublicKey = [u8; PUBLIC_KEY_LENGTH];
 
-// TODO(@ryankurte): port array types to use crate definitions
-pub type PublicKey = [u8; 32];
-pub type SecretKey = [u8; 32];
-pub type Signature = [u8; 64];
-pub type Scalar = [u8; 32];
+/// SecretKey array
+pub type SecretKey = [u8; SECRET_KEY_LENGTH];
 
+/// Signature array
+pub type Signature = [u8; SIGNATURE_LENGTH];
+
+/// Scalar array
+pub type Scalar = [u8; SCALAR_LENGTH];
 
 /// Derives a public key from a private key
-/// 
+///
 /// Compatible with ed25519-donna [ed25519_publickey](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L45)
 #[no_mangle]
 pub extern "C" fn dalek_ed25519_publickey(sk: *mut SecretKey, pk: *mut PublicKey) {
@@ -62,15 +80,23 @@ pub extern "C" fn dalek_ed25519_publickey(sk: *mut SecretKey, pk: *mut PublicKey
 }
 
 /// Verifies a signed message
-/// 
+///
 /// Compatible with ed25519-donna [ed25519_sign_open](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L94)
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_sign_open(m: *const u8, mlen: UInt, pk: *mut PublicKey, sig: *mut Signature) -> c_int {
+pub extern "C" fn dalek_ed25519_sign_open(
+    m: *const u8,
+    mlen: UInt,
+    pk: *mut PublicKey,
+    sig: *mut Signature,
+) -> c_int {
     // Convert pointers into slices
-    let (m, pk, sig) = unsafe {(
-        core::slice::from_raw_parts(m, mlen as usize),
-        &(*pk), &(*sig),
-    )};
+    let (m, pk, sig) = unsafe {
+        (
+            core::slice::from_raw_parts(m, mlen as usize),
+            &(*pk),
+            &(*sig),
+        )
+    };
 
     // Parse public key and signature
     let public_key = match ed25519_dalek::PublicKey::from_bytes(pk) {
@@ -95,15 +121,25 @@ pub extern "C" fn dalek_ed25519_sign_open(m: *const u8, mlen: UInt, pk: *mut Pub
 }
 
 /// Signs a message using the provided secret key
-/// 
+///
 /// Compatible with ed25519-donna [ed25519_sign](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L59)
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_sign(m: *const u8, mlen: UInt, sk: *mut SecretKey, pk: *mut PublicKey, sig: *mut Signature) {
+pub extern "C" fn dalek_ed25519_sign(
+    m: *const u8,
+    mlen: UInt,
+    sk: *mut SecretKey,
+    pk: *mut PublicKey,
+    sig: *mut Signature,
+) {
     // Convert pointers into slices
-    let (m, sk, pk, sig) = unsafe {(
-        core::slice::from_raw_parts(m, mlen as usize),
-        &(*sk), &(*pk), &mut (*sig),
-    )};
+    let (m, sk, pk, sig) = unsafe {
+        (
+            core::slice::from_raw_parts(m, mlen as usize),
+            &(*sk),
+            &(*pk),
+            &mut (*sig),
+        )
+    };
 
     // Parse keys
     let secret_key = match ed25519_dalek::SecretKey::from_bytes(sk) {
@@ -116,7 +152,7 @@ pub extern "C" fn dalek_ed25519_sign(m: *const u8, mlen: UInt, sk: *mut SecretKe
     };
 
     // Generate keypair for signing
-    let keypair = ed25519_dalek::Keypair{
+    let keypair = ed25519_dalek::Keypair {
         public: public_key,
         secret: secret_key,
     };
@@ -140,15 +176,24 @@ pub extern "C" fn dalek_ed25519_sign(m: *const u8, mlen: UInt, sk: *mut SecretKe
 // seems like [`ed25519_dalek::verify_batch`] could substitute but we still need to return the *valid values per message (and run without `std` or `alloc`)
 // TODO(@ryankurte): reverse engineer the error returns from the existing code
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_sign_open_batch(m: *mut *const u8, mlen: *mut UInt, pk: *mut *const u8, rs: *mut *const u8, num: UInt, valid: *mut c_int) -> c_int {
+pub extern "C" fn dalek_ed25519_sign_open_batch(
+    m: *mut *const u8,
+    mlen: *mut UInt,
+    pk: *mut *const u8,
+    rs: *mut *const u8,
+    num: UInt,
+    valid: *mut c_int,
+) -> c_int {
     // Convert pointers into slices
-    let (m, mlen, pk, rs, valid) = unsafe {(
-        core::slice::from_raw_parts(m, num as usize),
-        core::slice::from_raw_parts(mlen, num as usize),
-        core::slice::from_raw_parts_mut(pk, num as usize),
-        core::slice::from_raw_parts_mut(rs, num as usize),
-        core::slice::from_raw_parts_mut(valid, num as usize)
-    )};
+    let (m, mlen, pk, rs, valid) = unsafe {
+        (
+            core::slice::from_raw_parts(m, num as usize),
+            core::slice::from_raw_parts(mlen, num as usize),
+            core::slice::from_raw_parts_mut(pk, num as usize),
+            core::slice::from_raw_parts_mut(rs, num as usize),
+            core::slice::from_raw_parts_mut(valid, num as usize),
+        )
+    };
 
     let mut all_valid = 0;
 
@@ -158,10 +203,11 @@ pub extern "C" fn dalek_ed25519_sign_open_batch(m: *mut *const u8, mlen: *mut UI
     // Check for signature validity
     for i in 0..num as usize {
         let v = dalek_ed25519_sign_open(
-                m[i], mlen[i],
-                pk[i] as *mut PublicKey,
-                rs[i] as *mut Signature,
-            );
+            m[i],
+            mlen[i],
+            pk[i] as *mut PublicKey,
+            rs[i] as *mut Signature,
+        );
         valid[i] = match v {
             0 => 1,
             _ => {
@@ -183,11 +229,11 @@ pub extern "C" fn dalek_ed25519_randombytes_unsafe(out: *mut u8, count: UInt) {
 }
 
 /// Perform scalar multiplication of `e` over the edwards curve point
-/// 
+///
 /// Compatible with ed25519-donna [curved25519_scalarmult_basepoint](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L125)
 #[no_mangle]
 pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut Scalar, e: *mut Scalar) {
-    let (pk, e) = unsafe {( &mut (*pk), &(*e) )};
+    let (pk, e) = unsafe { (&mut (*pk), &(*e)) };
 
     // Copy into editable slice
     let mut ec = [0u8; 32];
@@ -196,7 +242,7 @@ pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut Scalar, e: *mu
     // Clamp
     ec[0] &= 248;
     ec[31] &= 127;
-    ec[31] |= 64;    
+    ec[31] |= 64;
 
     // Expand secret
     let s = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(ec);
@@ -212,16 +258,20 @@ pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut Scalar, e: *mu
     pk.copy_from_slice(u.as_bytes());
 }
 
-
 /// Scalar multiplication using the provided basepoint
 #[no_mangle]
-pub extern "C" fn dalek_curve25519_scalarmult(o: *mut PublicKey, e: *mut SecretKey, bp: *mut PublicKey) {
-    let (o, e, bp) = unsafe {( &mut (*o), &(*e), &(*bp) )};
+pub extern "C" fn dalek_curve25519_scalarmult(
+    o: *mut PublicKey,
+    e: *mut SecretKey,
+    bp: *mut PublicKey,
+) {
+    let (o, e, bp) = unsafe { (&mut (*o), &(*e), &(*bp)) };
 
     // Copy secret into editable slice
     let mut ec = [0u8; 32];
     ec.copy_from_slice(e);
 
+    // Copy basepoint (public key) into editable slice
     let mut bpc = [0u8; 32];
     bpc.copy_from_slice(bp);
 
@@ -259,18 +309,19 @@ pub extern "C" fn dalek_curve25519_scalarmult(o: *mut PublicKey, e: *mut SecretK
     };
 
     //#[cfg(nope)]
-    let p = {
-        x25519_dalek::x25519(ec, bpc)
-    };
+    let p = { x25519_dalek::x25519(ec, bpc) };
 
     // Write back to pk
     o.copy_from_slice(&p);
-
 }
 
 /// Generate a public key using the expanded (sk + sk_ext) form of the secret key
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_publickey_ext(sk: *mut SecretKey, sk_ext: *mut SecretKey, pk: *mut PublicKey) {
+pub extern "C" fn dalek_ed25519_publickey_ext(
+    sk: *mut SecretKey,
+    sk_ext: *mut SecretKey,
+    pk: *mut PublicKey,
+) {
     let (sk, sk_ext, pk) = unsafe { (&(*sk), &(*sk_ext), &mut (*pk)) };
 
     // Rebuild expanded key
@@ -291,13 +342,23 @@ pub extern "C" fn dalek_ed25519_publickey_ext(sk: *mut SecretKey, sk_ext: *mut S
 
 /// Generate a signature using the expanded (sk + sk_ext) form of the secret key.
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_sign_ext(m: *const u8, mlen: UInt,
-    sk: *mut SecretKey, sk_ext: *mut SecretKey, pk: *mut PublicKey, sig: *mut Signature,
+pub extern "C" fn dalek_ed25519_sign_ext(
+    m: *const u8,
+    mlen: UInt,
+    sk: *mut SecretKey,
+    sk_ext: *mut SecretKey,
+    pk: *mut PublicKey,
+    sig: *mut Signature,
 ) {
-    let (m, sk, sk_ext, pk, sig) = unsafe { (
-        core::slice::from_raw_parts(m, mlen as usize),
-        &(*sk), &(*sk_ext), &(*pk), &mut (*sig)
-    ) };
+    let (m, sk, sk_ext, pk, sig) = unsafe {
+        (
+            core::slice::from_raw_parts(m, mlen as usize),
+            &(*sk),
+            &(*sk_ext),
+            &(*pk),
+            &mut (*sig),
+        )
+    };
 
     // Rebuild extended key
     let mut sk_full = [0u8; 64];
@@ -316,9 +377,7 @@ pub extern "C" fn dalek_ed25519_sign_ext(m: *const u8, mlen: UInt,
 
     // Generate signature
     let signature = secret_key.sign(m, &public_key);
-    
+
     // Write to provided buffer
     sig.copy_from_slice(signature.as_ref());
-
 }
-

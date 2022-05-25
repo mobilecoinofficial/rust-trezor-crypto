@@ -1,6 +1,6 @@
 [package]
 name = "dalek-donna-ffi"
-description = "A dalek-based rust implementation of the ed25519-donna APIs"
+description = "A dalek-based rust implementation of the ed25519-donna APIs for FFI use with C applications"
 repository = "https://github.com/ryankurte/rust-dalek-donna"
 categories = [ "cryptography", "no-std" ]
 keywords = [ "cryptography", "crypto", "donna", "dalek", "ed25519" ]
@@ -9,6 +9,7 @@ edition = "2021"
 readme = "README.md"
 license = "BSD-3-Clause"
 
+# NOTE: [lib] declaration required to ensure exports are not --gc-sections'd when compiling for external linking
 [lib]
 
 [features]
@@ -21,7 +22,8 @@ default = [ "std", "u32_backend", "build_donna" ]
 [dependencies]
 cty = "0.2.2"
 getrandom = { version = "0.2.6", default_features = false }
-sha2 = { version = "*", default_features = false }
+sha2 = { version = "0.10.2", default_features = false }
+static_assertions = "1.1.0"
 
 curve25519-dalek = { version = "3.2.1", default_features = false }
 ed25519-dalek = { version = "1.0.1", default_features = false }
@@ -36,8 +38,8 @@ glob = "0.3.0"
 [dev-dependencies]
 base64 = "0.13.0"
 libc = "0.2.126"
+
+# NOTE: old rand-core required for dalek crates
 rand_core = { version = "0.5.1", features = [ "std" ] }
 
 [patch.crates-io]
-#curve25519-dalek = { git = "https://github.com/dalek-cryptography/curve25519-dalek" }
-#ed25519-dalek = { git = "https://github.com/dalek-cryptography/ed25519-dalek" }

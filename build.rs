@@ -1,4 +1,3 @@
-
 use std::path::PathBuf;
 
 fn main() -> anyhow::Result<()> {
@@ -16,7 +15,6 @@ fn main() -> anyhow::Result<()> {
 // Build C bindings for test use
 #[cfg(feature = "build_donna")]
 fn build_bindings() -> anyhow::Result<()> {
-
     let out_path = PathBuf::from(std::env::var("OUT_DIR").unwrap());
 
     // Generate bindings
@@ -48,7 +46,6 @@ fn build_bindings() -> anyhow::Result<()> {
 // Build donna C library for test use
 #[cfg(feature = "build_donna")]
 fn build_lib() -> anyhow::Result<()> {
-
     println!("cargo:rerun-if-changed=tests/extensions.c");
 
     // Compile library
@@ -57,7 +54,6 @@ fn build_lib() -> anyhow::Result<()> {
         .include("vendor/ed25519-donna")
         .file("vendor/ed25519-donna/ed25519.c")
         .file("tests/extensions.c")
-
         // Using reference hasher for ease, could swap to rust version
         .define("ED25519_REFHASH", "1")
         .define("ED25519_TEST", "1")
