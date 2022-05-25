@@ -6,7 +6,7 @@ extern crate test;
 
 extern crate libc;
 
-use dalek_donna_ffi::{test::*, PublicKey, Scalar, SecretKey, Signature};
+use trezor_crypto_lib::{test::*, PublicKey, Scalar, SecretKey, Signature};
 
 /// Check key derivation functions are compatible
 #[test]

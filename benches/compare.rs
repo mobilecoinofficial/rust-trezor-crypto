@@ -2,7 +2,7 @@
 
 extern crate test;
 
-use dalek_donna_ffi::test::*;
+use trezor_crypto_lib::test::*;
 
 const BENCH_BATCH_SIZE: usize = 64;
 

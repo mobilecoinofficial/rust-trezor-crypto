@@ -1,7 +1,7 @@
 [package]
-name = "dalek-donna-ffi"
-description = "A dalek-based rust implementation of the ed25519-donna APIs for FFI use with C applications"
-repository = "https://github.com/ryankurte/rust-dalek-donna"
+name = "trezor-crypto-lib"
+description = "A rust implementation of the trezor crypto library"
+repository = "https://github.com/ryankurte/rust-trezor-crypto"
 categories = [ "cryptography", "no-std" ]
 keywords = [ "cryptography", "crypto", "donna", "dalek", "ed25519" ]
 version = "0.1.0"

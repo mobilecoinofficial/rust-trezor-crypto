@@ -276,9 +276,9 @@ pub extern "C" fn dalek_curve25519_scalarmult(
     bpc.copy_from_slice(bp);
 
     // Clamp secret key and expand
-    ec[0] &= 248;
-    ec[31] &= 127;
-    ec[31] |= 64;
+    //ec[0] &= 248;
+    //ec[31] &= 127;
+    //ec[31] |= 64;
 
     let secret = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(ec.clone());
 
