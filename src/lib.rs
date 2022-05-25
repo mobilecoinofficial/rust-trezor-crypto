@@ -275,40 +275,12 @@ pub extern "C" fn dalek_curve25519_scalarmult(
     let mut bpc = [0u8; 32];
     bpc.copy_from_slice(bp);
 
-    // Clamp secret key and expand
-    //ec[0] &= 248;
-    //ec[31] &= 127;
-    //ec[31] |= 64;
+    // Clamp secret key
+    ec[0] &= 248;
+    ec[31] &= 127;
+    ec[31] |= 64;
 
-    let secret = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(ec.clone());
-
-    let basepoint = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(bpc.clone());
-
-    // Perform multiplication
-    // TODO: work out what this is -meant- to be doing
-
-    #[cfg(nope)]
-    let p = {
-        let p = &ED25519_BASEPOINT_TABLE.basepoint_mul(&basepoint) * &secret;
-        p.to_montgomery().to_bytes()
-    };
-
-    #[cfg(nope)]
-    let p = {
-        let p = &ED25519_BASEPOINT_TABLE * &secret * &basepoint;
-        p.to_montgomery().to_bytes()
-    };
-
-    #[cfg(nope)]
-    let p = {
-        let shared = x25519_dalek::StaticSecret::from(ec.clone());
-        let public = x25519_dalek::PublicKey::from(bpc.clone());
-
-        let x = shared.diffie_hellman(&public);
-        x.to_bytes()
-    };
-
-    //#[cfg(nope)]
+    // Compute DH
     let p = { x25519_dalek::x25519(ec, bpc) };
 
     // Write back to pk

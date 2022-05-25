@@ -391,15 +391,14 @@ const SCALARMULT_VECS: (&str, &str, &str) = (
 );
 
 #[test]
-#[ignore = "curve25519_scalarmult not yet implemented"]
 fn curve25519_scalarmult_vectors() {
-    let (mut sk, mut pk, mut sess) = ([0u8; 64], [0u8; 64], [0u8; 64]);
+    let (mut sk, mut pk, mut sess) = ([0u8; 32], [0u8; 32], [0u8; 32]);
 
-    base64::decode_config_slice(SCALARMULT_VECS.0, base64::STANDARD, &mut sk).unwrap();
-    base64::decode_config_slice(SCALARMULT_VECS.1, base64::STANDARD, &mut pk).unwrap();
-    base64::decode_config_slice(SCALARMULT_VECS.2, base64::STANDARD, &mut sess).unwrap();
+    hex::decode_to_slice(SCALARMULT_VECS.0, &mut sk).unwrap();
+    hex::decode_to_slice(SCALARMULT_VECS.1, &mut pk).unwrap();
+    hex::decode_to_slice(SCALARMULT_VECS.2, &mut sess).unwrap();
 
-    let mut sess2 = [0u8; 64];
+    let mut sess2 = [0u8; 32];
     unsafe {
         (DALEK.curve25519_scalarmult)(
             sess2.as_mut_ptr() as *mut Scalar,
@@ -408,13 +407,12 @@ fn curve25519_scalarmult_vectors() {
         )
     };
 
-    assert_eq!(&sess[..32], &sess2[..32])
+    assert_eq!(&sess[..], &sess2[..])
 }
 
 /// Test scalar multiplication with provided basepoints
 // TODO(@ryankurte): does this make sense?
 #[test]
-#[ignore = "curve25519_scalarmult not yet implemented"]
 fn curve25519_scalarmult() {
     let mut rng = rand_core::OsRng;
 

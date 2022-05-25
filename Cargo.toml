@@ -37,6 +37,7 @@ glob = "0.3.0"
 
 [dev-dependencies]
 base64 = "0.13.0"
+hex = "0.4.3"
 libc = "0.2.126"
 
 # NOTE: old rand-core required for dalek crates
