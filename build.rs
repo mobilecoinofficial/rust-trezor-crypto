@@ -29,10 +29,11 @@ fn build_bindings() -> anyhow::Result<()> {
         .allowlist_type("ed25519_.*")
         .allowlist_type("curved25519_.*")
         .allowlist_function("ed25519_.*")
+        .allowlist_function("curve25519_.*")
         .allowlist_function("curved25519_.*")
         // Array pointers in arguments neatens up the function definitions
         // but doesn't help with the mutability bug
-        //.array_pointers_in_arguments(true)
+        .array_pointers_in_arguments(true)
         .generate()
         .expect("Unable to generate bindings");
 
@@ -48,11 +49,15 @@ fn build_bindings() -> anyhow::Result<()> {
 #[cfg(feature = "build_donna")]
 fn build_lib() -> anyhow::Result<()> {
 
+    println!("cargo:rerun-if-changed=tests/extensions.c");
+
     // Compile library
     // See `src/ffi.rs` for linking
     cc::Build::new()
         .include("vendor/ed25519-donna")
         .file("vendor/ed25519-donna/ed25519.c")
+        .file("tests/extensions.c")
+
         // Using reference hasher for ease, could swap to rust version
         .define("ED25519_REFHASH", "1")
         .define("ED25519_TEST", "1")

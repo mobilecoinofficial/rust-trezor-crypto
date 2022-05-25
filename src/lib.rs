@@ -8,7 +8,7 @@
 use cty::c_int;
 
 use ed25519_dalek::{Signer, Verifier, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SIGNATURE_LENGTH};
-use curve25519_dalek::{scalar::Scalar, constants::ED25519_BASEPOINT_TABLE};
+use curve25519_dalek::{constants::ED25519_BASEPOINT_TABLE};
 
 #[cfg(feature = "build_donna")]
 pub mod ffi;
@@ -28,16 +28,19 @@ pub type UInt = cty::c_uint;
 pub type UInt = cty::uint64_t;
 
 
+// TODO(@ryankurte): port array types to use crate definitions
+pub type PublicKey = [u8; 32];
+pub type SecretKey = [u8; 32];
+pub type Signature = [u8; 64];
+pub type Scalar = [u8; 32];
+
+
 /// Derives a public key from a private key
 /// 
 /// Compatible with ed25519-donna [ed25519_publickey](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L45)
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_publickey(sk: *mut u8, pk: *mut u8) {
-    // Convert pointers to slices
-    let (sk, pk) = unsafe {
-        (core::slice::from_raw_parts(sk, SECRET_KEY_LENGTH),
-        core::slice::from_raw_parts_mut(pk, PUBLIC_KEY_LENGTH))
-    };
+pub extern "C" fn dalek_ed25519_publickey(sk: *mut SecretKey, pk: *mut PublicKey) {
+    let (sk, pk) = unsafe { (&(*sk), &mut (*pk)) };
 
     // Parse out secret key
     let secret_key = match ed25519_dalek::SecretKey::from_bytes(sk) {
@@ -61,12 +64,11 @@ pub extern "C" fn dalek_ed25519_publickey(sk: *mut u8, pk: *mut u8) {
 /// 
 /// Compatible with ed25519-donna [ed25519_sign_open](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L94)
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_sign_open(m: *const u8, mlen: UInt, pk: *mut u8, sig: *mut u8) -> c_int {
+pub extern "C" fn dalek_ed25519_sign_open(m: *const u8, mlen: UInt, pk: *mut PublicKey, sig: *mut Signature) -> c_int {
     // Convert pointers into slices
     let (m, pk, sig) = unsafe {(
         core::slice::from_raw_parts(m, mlen as usize),
-        core::slice::from_raw_parts(pk, PUBLIC_KEY_LENGTH),
-        core::slice::from_raw_parts(sig, SIGNATURE_LENGTH),
+        &(*pk), &(*sig),
     )};
 
     // Parse public key and signature
@@ -76,7 +78,7 @@ pub extern "C" fn dalek_ed25519_sign_open(m: *const u8, mlen: UInt, pk: *mut u8,
             return -1;
         }
     };
-    let signature = match ed25519_dalek::Signature::try_from(sig) {
+    let signature = match ed25519_dalek::Signature::try_from(&sig[..]) {
         Ok(v) => v,
         Err(_e) => {
             return -2;
@@ -95,13 +97,11 @@ pub extern "C" fn dalek_ed25519_sign_open(m: *const u8, mlen: UInt, pk: *mut u8,
 /// 
 /// Compatible with ed25519-donna [ed25519_sign](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L59)
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_sign(m: *const u8, mlen: UInt, sk: *mut u8, pk: *mut u8, sig: *mut u8) {
+pub extern "C" fn dalek_ed25519_sign(m: *const u8, mlen: UInt, sk: *mut SecretKey, pk: *mut PublicKey, sig: *mut Signature) {
     // Convert pointers into slices
     let (m, sk, pk, sig) = unsafe {(
         core::slice::from_raw_parts(m, mlen as usize),
-        core::slice::from_raw_parts(sk, SECRET_KEY_LENGTH),
-        core::slice::from_raw_parts(pk, PUBLIC_KEY_LENGTH),
-        core::slice::from_raw_parts_mut(sig, SIGNATURE_LENGTH),
+        &(*sk), &(*pk), &mut (*sig),
     )};
 
     // Parse keys
@@ -136,7 +136,7 @@ pub extern "C" fn dalek_ed25519_sign(m: *const u8, mlen: UInt, sk: *mut u8, pk: 
 
 /// Batch verify signatures, valid[i] == 1 for valid, 0 otherwise
 // TODO(@ryankurte): `ed25519-donna-batchverify.h` has -a lot- going on, presumably for performance reasons (see `cargo bench`)...
-// seems like [`ed25519_dalek::verify_batch`] could substitute but we still need to return the *valid values per message
+// seems like [`ed25519_dalek::verify_batch`] could substitute but we still need to return the *valid values per message (and run without `std` or `alloc`)
 // TODO(@ryankurte): reverse engineer the error returns from the existing code
 #[no_mangle]
 pub extern "C" fn dalek_ed25519_sign_open_batch(m: *mut *const u8, mlen: *mut UInt, pk: *mut *const u8, rs: *mut *const u8, num: UInt, valid: *mut c_int) -> c_int {
@@ -156,7 +156,11 @@ pub extern "C" fn dalek_ed25519_sign_open_batch(m: *mut *const u8, mlen: *mut UI
 
     // Check for signature validity
     for i in 0..num as usize {
-        let v = dalek_ed25519_sign_open(m[i], mlen[i], pk[i] as *mut u8, rs[i] as *mut u8);
+        let v = dalek_ed25519_sign_open(
+                m[i], mlen[i],
+                pk[i] as *mut PublicKey,
+                rs[i] as *mut Signature,
+            );
         valid[i] = match v {
             0 => 1,
             _ => {
@@ -181,11 +185,8 @@ pub extern "C" fn dalek_ed25519_randombytes_unsafe(out: *mut u8, count: UInt) {
 /// 
 /// Compatible with ed25519-donna [curved25519_scalarmult_basepoint](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L125)
 #[no_mangle]
-pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut u8, e: *mut u8) {
-    let (pk, e) = unsafe {(
-        core::slice::from_raw_parts_mut(pk, 32),
-        core::slice::from_raw_parts(e, 32),
-    )};
+pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut Scalar, e: *mut Scalar) {
+    let (pk, e) = unsafe {( &mut (*pk), &(*e) )};
 
     // Copy into editable slice
     let mut ec = [0u8; 32];
@@ -196,8 +197,8 @@ pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut u8, e: *mut u8
     ec[31] &= 127;
     ec[31] |= 64;    
 
-    // Expand basepoint
-    let s = Scalar::from_bytes_mod_order(ec);
+    // Expand secret
+    let s = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(ec);
 
     // scalar * basepoint
     let p = &ED25519_BASEPOINT_TABLE * &s;
@@ -209,3 +210,94 @@ pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut u8, e: *mut u8
     // Write back to pk
     pk.copy_from_slice(u.as_bytes());
 }
+
+
+/// Scalar multiplication using the provided basepoint
+#[no_mangle]
+pub extern "C" fn dalek_curve25519_scalarmult(pk: *mut PublicKey, e: *mut SecretKey, bp: *mut Scalar) {
+    let (pk, e, bp) = unsafe {( &mut (*pk), &(*e), &(*bp) )};
+
+    // Copy secret into editable slice
+    let mut ec = [0u8; 32];
+    ec.copy_from_slice(e);
+
+    // Clamp
+    ec[0] &= 248;
+    ec[31] &= 127;
+    ec[31] |= 64;
+
+    // Expand secret
+    let s = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(ec);
+
+    // Load basepoint
+    let mut basepoint = [0u8; 32];
+    basepoint.copy_from_slice(bp);
+
+    let basepoint = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(basepoint);
+
+    // Perform multiplication
+    let p = ED25519_BASEPOINT_TABLE.basepoint_mul(&basepoint) * &s;
+
+    // convert to montgomery
+    /* u = (y + z) / (z - y) */
+    let u = p.to_montgomery();
+
+    // Write back to pk
+    pk.copy_from_slice(u.as_bytes());
+
+}
+
+/// Generate a public key using the expanded (sk + sk_ext) form of the secret key
+#[no_mangle]
+pub extern "C" fn dalek_ed25519_publickey_ext(sk: *mut SecretKey, sk_ext: *mut SecretKey, pk: *mut PublicKey) {
+    let (sk, sk_ext, pk) = unsafe { (&(*sk), &(*sk_ext), &mut (*pk)) };
+
+    // Rebuild expanded key
+    let mut sk_full = [0u8; 64];
+    sk_full[..32].copy_from_slice(sk);
+    sk_full[32..].copy_from_slice(sk_ext);
+
+    let expanded = match ed25519_dalek::ExpandedSecretKey::from_bytes(&sk_full) {
+        Ok(v) => v,
+        Err(_e) => return,
+    };
+
+    // Generate public key
+    let public = ed25519_dalek::PublicKey::from(&expanded);
+
+    pk.copy_from_slice(public.as_ref());
+}
+
+/// Generate a signature using the expanded (sk + sk_ext) form of the secret key.
+#[no_mangle]
+pub extern "C" fn dalek_ed25519_sign_ext(m: *const u8, mlen: UInt,
+    sk: *mut SecretKey, sk_ext: *mut SecretKey, pk: *mut PublicKey, sig: *mut Signature,
+) {
+    let (m, sk, sk_ext, pk, sig) = unsafe { (
+        core::slice::from_raw_parts(m, mlen as usize),
+        &(*sk), &(*sk_ext), &(*pk), &mut (*sig)
+    ) };
+
+    // Rebuild extended key
+    let mut sk_full = [0u8; 64];
+    sk_full[..32].copy_from_slice(sk);
+    sk_full[32..].copy_from_slice(sk_ext);
+
+    let secret_key = match ed25519_dalek::ExpandedSecretKey::from_bytes(&sk_full) {
+        Ok(k) => k,
+        Err(_e) => return,
+    };
+
+    let public_key = match ed25519_dalek::PublicKey::from_bytes(pk) {
+        Ok(v) => v,
+        Err(_e) => return,
+    };
+
+    // Generate signature
+    let signature = secret_key.sign(m, &public_key);
+    
+    // Write to provided buffer
+    sig.copy_from_slice(signature.as_ref());
+
+}
+

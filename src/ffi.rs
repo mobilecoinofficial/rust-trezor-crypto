@@ -10,6 +10,7 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 // Link donna library if enabled with feature `donna`
 #[cfg_attr(feature = "build_donna", link(name = "ed25519_donna"))] extern {}
 
+#[cfg_attr(feature = "build_donna", link(name = "c"))] extern {}
 
 pub type PublicKey = crate::ffi::ed25519_public_key;
 

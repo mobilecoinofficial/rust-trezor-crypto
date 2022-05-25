@@ -4,10 +4,11 @@ use crate::UInt;
 
 extern crate test;
 
-use curve25519_dalek::scalar::Scalar;
-use dalek_donna::{test::*, ffi::{PublicKey, SecretKey}};
+extern crate libc;
 
-/// Check key derivation functions match
+use dalek_donna_ffi::{test::*, PublicKey, SecretKey, Scalar, Signature};
+
+/// Check key derivation functions are compatible
 #[test]
 fn derive_keys() {
     let mut sk: SecretKey = [0u8; 32];
@@ -18,13 +19,19 @@ fn derive_keys() {
     // Perform dalek key derivation
     let mut dalek_sk = sk.clone();
     let mut dalek_pk: PublicKey = [0u8; 32];
-    unsafe { (DALEK.ed25519_publickey)(dalek_sk.as_mut_ptr(), dalek_pk.as_mut_ptr()) };
+    unsafe { (DALEK.ed25519_publickey)(
+        dalek_sk.as_mut_ptr() as *mut SecretKey,
+        dalek_pk.as_mut_ptr() as *mut PublicKey,
+    ) };
     assert_eq!(dalek_sk, sk);
 
     // Perform donna key derivation
     let mut donna_sk = sk.clone();
     let mut donna_pk: PublicKey = [0u8; 32];
-    unsafe { (DONNA.ed25519_publickey)(donna_sk.as_mut_ptr(), donna_pk.as_mut_ptr()) };
+    unsafe { (DONNA.ed25519_publickey)(
+        donna_sk.as_mut_ptr() as *mut SecretKey, 
+        donna_pk.as_mut_ptr() as *mut PublicKey,
+    ) };
     assert_eq!(donna_sk, sk);
     
     // Compare results
@@ -40,22 +47,38 @@ fn sign_verify(signer: &Driver, verifier: &Driver) {
     let mut sk: SecretKey = [0u8; 32];
     getrandom::getrandom(&mut sk).unwrap();
     let mut pk: PublicKey = [0u8; 32];
-    unsafe { (signer.ed25519_publickey)(sk.as_mut_ptr(), pk.as_mut_ptr()) };
+    unsafe { (signer.ed25519_publickey)(
+        sk.as_mut_ptr() as *mut SecretKey,
+        pk.as_mut_ptr() as *mut PublicKey,
+    ) };
 
     let mut sig = [0u8; 64];
 
     // Sign using donna
-    unsafe { (signer.ed25519_sign)(m.as_ptr(), m.len() as UInt, sk.as_mut_ptr(), pk.as_mut_ptr(), sig.as_mut_ptr()) };
+    unsafe { (signer.ed25519_sign)(
+        m.as_ptr(), m.len() as UInt, 
+        sk.as_mut_ptr() as *mut SecretKey,
+        pk.as_mut_ptr() as *mut PublicKey,
+        sig.as_mut_ptr() as *mut Signature,
+    ) };
 
     // Verify using dalek
 
     // Check OK signature
-    let res = unsafe { (verifier.ed25519_sign_open)(m.as_ptr(), m.len() as UInt, pk.as_mut_ptr(), sig.as_mut_ptr()) };
+    let res = unsafe { (verifier.ed25519_sign_open)(
+        m.as_ptr(), m.len() as UInt,
+        pk.as_mut_ptr() as *mut PublicKey,
+        sig.as_mut_ptr() as *mut Signature,
+    ) };
     assert_eq!(res, 0);
 
     // Check broken signature
     sig[0] ^= 0xFF;
-    let res = unsafe { (verifier.ed25519_sign_open)(m.as_ptr(), m.len() as UInt, pk.as_mut_ptr(), sig.as_mut_ptr()) };
+    let res = unsafe { (verifier.ed25519_sign_open)(
+        m.as_ptr(), m.len() as UInt,
+        pk.as_mut_ptr() as *mut PublicKey,
+        sig.as_mut_ptr() as *mut Signature,
+    ) };
     assert!(res != 0);
 }
 
@@ -79,7 +102,7 @@ fn dalek_sign_donna_verify() {
     sign_verify(&DALEK, &DONNA);
 }
 
-
+/// Test batch verification
 fn batch_verify<const N: usize>(signer: &Driver, verifier: &Driver) {
     // Generate messages / keys / signatures
     let batch = generate_batch::<N>(signer);
@@ -152,14 +175,18 @@ fn batch_verify_dalek_donna() {
     batch_verify::<TEST_BATCH_SIZE>(&DALEK, &DONNA);
 }
 
+/// Test scalar multiplication
 #[test]
-fn scalarmult() {
+fn scalarmult_basepoint() {
     let mut rng = rand_core::OsRng;
 
+    use curve25519_dalek::scalar::{Scalar as S};
+
+    // Test set, zero one and a random scalar
     let scalars = &[
-        Scalar::zero(),
-        Scalar::one(),
-        Scalar::random(&mut rng),
+        S::zero(),
+        S::one(),
+        S::random(&mut rng),
     ];
 
     for s in scalars {
@@ -167,16 +194,169 @@ fn scalarmult() {
 
         let mut dalek_s = [0u8; 32];
         unsafe {
-            (DALEK.curve25519_scalarmult_basepoint)(dalek_s.as_mut_ptr(), s.as_mut_ptr());
+            (DALEK.curved25519_scalarmult_basepoint)(
+                dalek_s.as_mut_ptr()  as *mut Scalar,
+                s.as_mut_ptr()  as *mut Scalar,
+            );
         }
 
         let mut donna_s = [0u8; 32];
         unsafe {
-            (DONNA.curve25519_scalarmult_basepoint)(donna_s.as_mut_ptr(), s.as_mut_ptr());
+            (DONNA.curved25519_scalarmult_basepoint)(
+                donna_s.as_mut_ptr()  as *mut Scalar,
+                s.as_mut_ptr()  as *mut Scalar,
+            );
         }
 
         assert_eq!(dalek_s, donna_s);
     }
-
     
 }
+
+/// Test scalar multiplication with provided basepoint
+#[test]
+#[ignore = "FFI curve25519_scalarmult not yet implemented"]
+fn scalarmult() {
+    let mut rng = rand_core::OsRng;
+
+    use curve25519_dalek::scalar::{Scalar as S};
+
+    // Test set, zero one and a random scalar
+    let tests = &[
+        (S::zero(),             S::one()),
+        (S::one(),              S::one()),
+        (S::random(&mut rng),   S::one()),
+    ];
+
+    for (s, bp) in tests {
+        let mut s = s.as_bytes().to_vec();
+        let mut bp = bp.as_bytes().to_vec();
+
+        let mut dalek_s = [0u8; 32];
+        unsafe {
+            (DALEK.curve25519_scalarmult)(
+                dalek_s.as_mut_ptr() as *mut Scalar,
+                s.as_mut_ptr() as *mut Scalar,
+                bp.as_mut_ptr() as *mut Scalar,
+            );
+        }
+
+        let mut donna_s = [0u8; 32];
+        unsafe {
+            (DONNA.curve25519_scalarmult)(
+                donna_s.as_mut_ptr()  as *mut Scalar,
+                s.as_mut_ptr()  as *mut Scalar,
+                bp.as_mut_ptr() as *mut Scalar,
+            );
+        }
+
+        assert_eq!(dalek_s, donna_s);
+    }
+    
+}
+
+
+/// Test expanded public key generation
+#[test]
+fn publickey_ext() {
+    // Create new secret key and generate
+    let mut sk: SecretKey = [0u8; 32];
+    getrandom::getrandom(&mut sk).unwrap();
+
+    // Generate expanded secret key
+    let expanded = {
+        let sk = ed25519_dalek::SecretKey::from_bytes(&sk).unwrap();
+        ed25519_dalek::ExpandedSecretKey::from(&sk).to_bytes()
+    };
+
+    let (mut sk_base, mut sk_ext) = ([0u8; 32], [0u8; 32]);
+    sk_base.copy_from_slice(&expanded[..32]);
+    sk_ext.copy_from_slice(&expanded[32..]);
+
+    // Perform dalek key derivation
+    let mut dalek_pk: PublicKey = [0u8; 32];
+    unsafe { (DALEK.ed25519_publickey_ext)(
+        sk_base.as_mut_ptr() as *mut SecretKey,
+        sk_ext.as_mut_ptr() as *mut SecretKey,
+        dalek_pk.as_mut_ptr() as *mut PublicKey,
+    ) };
+    assert_eq!(&sk_base, &expanded[..32]);
+
+    // Perform donna key derivation
+    let mut donna_pk: PublicKey = [0u8; 32];
+    unsafe { (DONNA.ed25519_publickey_ext)(
+        sk_base.as_mut_ptr() as *mut SecretKey, 
+        sk_ext.as_mut_ptr() as *mut SecretKey,
+        donna_pk.as_mut_ptr() as *mut PublicKey,
+    ) };
+    assert_eq!(&sk_base, &expanded[..32]);
+    
+    // Compare results
+    assert_eq!(dalek_pk, donna_pk);
+}
+
+
+/// Test expanded key signing
+fn sign_ext(signer: &Driver, verifier: &Driver) {
+    let mut m = [0u8; 48];
+    getrandom::getrandom(&mut m).unwrap();
+
+    let mut sk: SecretKey = [0u8; 32];
+    getrandom::getrandom(&mut sk).unwrap();
+
+    // Generate expanded secret key
+    let expanded = {
+        let sk = ed25519_dalek::SecretKey::from_bytes(&sk).unwrap();
+        ed25519_dalek::ExpandedSecretKey::from(&sk)
+    };
+
+    let ex = expanded.to_bytes();
+    let (mut sk_base, mut sk_ext) = ([0u8; 32], [0u8; 32]);
+    sk_base.copy_from_slice(&ex[..32]);
+    sk_ext.copy_from_slice(&ex[32..]);
+
+    // Generate matching expanded public key
+    let mut pk: PublicKey = [0u8; 32];
+    unsafe {
+        (signer.ed25519_publickey_ext)(
+            sk_base.as_mut_ptr() as *mut SecretKey,
+            sk_ext.as_mut_ptr() as *mut SecretKey,
+            pk.as_mut_ptr() as *mut PublicKey,
+    ) };
+
+    // Perform sign
+    let mut sig: Signature = [0u8; 64];
+    unsafe {
+        (signer.ed25519_sign_ext)(
+            m.as_mut_ptr(),
+            m.len() as UInt,
+            sk_base.as_mut_ptr() as *mut SecretKey,
+            sk_ext.as_mut_ptr() as *mut SecretKey,
+            pk.as_mut_ptr() as *mut PublicKey,
+            sig.as_mut_ptr() as *mut Signature,
+        )
+    }
+
+    // Perform verify
+    let res = unsafe {
+        (verifier.ed25519_sign_open)(
+            m.as_mut_ptr(),
+            m.len() as UInt,
+            pk.as_mut_ptr() as *mut PublicKey,
+            sig.as_mut_ptr() as *mut Signature,
+        )
+    };
+    assert_eq!(res, 0);
+}
+
+
+#[test]
+fn sign_ext_dalek_donna() {
+    sign_ext(&DALEK, &DONNA);
+}
+
+#[test]
+fn sign_ext_donna_dalek() {
+    sign_ext(&DALEK, &DONNA);
+}
+
