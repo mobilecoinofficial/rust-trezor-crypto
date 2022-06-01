@@ -1,5 +1,6 @@
 
 
+// TODO: work out what needs re-implementing? the core operations already exist in `curved_` functions so maybe we can avoid this completely..?
 
 #[cfg(test)]
 mod tests {
@@ -25,13 +26,9 @@ mod tests {
         curve25519_basepoint: ffi::curve25519_basepoint,
     };
 
-    /// Dalek driver implementation (native rust)
-    #[cfg(todo)]
-    pub const DALEK: Driver = Driver {
-        curve25519: todo!(),
-        curve25519_basepoint: todo!(),
-    };
+    // TODO: Donna driver
 
+    // TODO: Interop tests
 
 }
 

@@ -1,6 +1,6 @@
 
-use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
-use ed25519_dalek::{Signer, Verifier};
+use curve25519_dalek::{constants::ED25519_BASEPOINT_TABLE, digest::{Digest, consts::U64}};
+use ed25519_dalek::{Signer, Verifier, Sha512};
 
 use crate::{UInt, c_int};
 
@@ -31,11 +31,22 @@ pub type Signature = [u8; SIGNATURE_LENGTH];
 /// Scalar array
 pub type Scalar = [u8; SCALAR_LENGTH];
 
-/// Derives a public key from a private key
+
+pub mod keccak;
+
+pub mod sha3;
+
+
+/// Derives a public key from a private key using the default (Sha512) digest
 ///
 /// Compatible with ed25519-donna [ed25519_publickey](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L45)
 #[no_mangle]
 pub extern "C" fn dalek_ed25519_publickey(sk: *mut SecretKey, pk: *mut PublicKey) {
+    ed25519_publickey::<Sha512>(sk, pk)
+}
+
+/// Internal public key function, generic over digest types
+fn ed25519_publickey<D: Digest<OutputSize=U64>>(sk: *mut SecretKey, pk: *mut PublicKey) {
     let (sk, pk) = unsafe { (&(*sk), &mut (*pk)) };
 
     // Parse out secret key
@@ -56,11 +67,21 @@ pub extern "C" fn dalek_ed25519_publickey(sk: *mut SecretKey, pk: *mut PublicKey
     pk.copy_from_slice(public_key.as_bytes());
 }
 
-/// Verifies a signed message
+/// Verifies a signed message using standard (Sha512) digest
 ///
 /// Compatible with ed25519-donna [ed25519_sign_open](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L94)
 #[no_mangle]
 pub extern "C" fn dalek_ed25519_sign_open(
+    m: *const u8,
+    mlen: UInt,
+    pk: *mut PublicKey,
+    sig: *mut Signature,
+) -> c_int {
+    return ed25519_sign_open::<Sha512>(m, mlen, pk, sig);
+}
+
+/// Internal verify function, generic over digest types
+fn ed25519_sign_open<D: Digest<OutputSize=U64>>(
     m: *const u8,
     mlen: UInt,
     pk: *mut PublicKey,
@@ -90,18 +111,15 @@ pub extern "C" fn dalek_ed25519_sign_open(
     };
 
     // Verify signature
-    if let Err(_e) = public_key.verify(m, &signature) {
+    if let Err(_e) = public_key.verify_digest::<D>(m, &signature) {
         return -3;
     }
 
     return 0;
 }
 
-/// Signs a message using the provided secret key
-///
-/// Compatible with ed25519-donna [ed25519_sign](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L59)
-#[no_mangle]
-pub extern "C" fn dalek_ed25519_sign(
+/// Internal sign function, generic over digest types
+fn ed25519_sign<D: Digest<OutputSize=U64>>(
     m: *const u8,
     mlen: UInt,
     sk: *mut SecretKey,
@@ -128,24 +146,31 @@ pub extern "C" fn dalek_ed25519_sign(
         Err(_e) => return,
     };
 
-    // Generate keypair for signing
-    let keypair = ed25519_dalek::Keypair {
-        public: public_key,
-        secret: secret_key,
-    };
+    // Generate edpanded for signing
+    let expanded_key = ed25519_dalek::ExpandedSecretKey::from(&secret_key);
+
+    let mut d = D::new();
+    d.update(m);
 
     // Sign message
-    let signature = match keypair.try_sign(m) {
-        Ok(v) => v,
-        Err(_e) => {
-            // Ensure signature is zeroed
-            sig.iter_mut().for_each(|v| *v = 0);
-            return;
-        }
-    };
+    let signature = expanded_key.sign_digest::<D>(m, &public_key);
 
     // Write signature back
     sig.copy_from_slice(signature.as_ref());
+}
+
+/// Signs a message using the provided secret key (using the default Sha512 digest)
+///
+/// Compatible with ed25519-donna [ed25519_sign](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L59)
+#[no_mangle]
+pub extern "C" fn dalek_ed25519_sign(
+    m: *const u8,
+    mlen: UInt,
+    sk: *mut SecretKey,
+    pk: *mut PublicKey,
+    sig: *mut Signature,
+) {
+    ed25519_sign::<Sha512>(m, mlen, sk, pk, sig);
 }
 
 /// Batch verify signatures, valid[i] == 1 for valid, 0 otherwise

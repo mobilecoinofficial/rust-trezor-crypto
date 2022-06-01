@@ -31,6 +31,7 @@ fn build_bindings() -> anyhow::Result<()> {
         .ctypes_prefix("cty")
         .allowlist_type("ed25519_.*")
         .allowlist_type("curved25519_.*")
+        .allowlist_type("ge25519_.*")
         .allowlist_function("ed25519_.*")
         .allowlist_function("curve25519_.*")
         .allowlist_function("curved25519_.*")
@@ -59,6 +60,9 @@ fn build_lib() -> anyhow::Result<()> {
         .include("vendor/ed25519-donna")
         .file("vendor/ed25519-donna/ed25519.c")
         .file("tests/extensions.c")
+        // TODO: re-enable these
+        //.file("tests/ed25519-keccak.c")
+        //.file("tests/ed25519-sha3.c")
         // Using reference hasher for ease, could swap to rust version
         .define("ED25519_REFHASH", "1")
         .define("ED25519_TEST", "1")
