@@ -1,16 +1,14 @@
 
-// ed25519-donna base header
+// Donna project base headers
+#include <stdint.h>
+
+#define DONNA_INLINE
+#undef ALIGN
+#define ALIGN(x) __attribute__((aligned(x)))
+
 #include "ed25519.h"
-
-// Test data via `ed25519-donna/test.c` and `ed25519-donna/regression.h`
-typedef struct  {
-	unsigned char sk[32], pk[32], sig[64];
-	const char *m;
-} test_data_t;
-
-test_data_t test_dataset[] = {
-#include "regression.h"
-};
+#include "curve25519.h"
+#include "curve25519-donna-32bit.h"
 
 // Extensions, ported from trezor donna
 // TODO(@ryankurte): not in upstream donna, where do these -come- from?!

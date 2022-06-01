@@ -2,8 +2,9 @@
 
 pub use crate::UInt;
 use crate::{
-    consts::{PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SIGNATURE_LENGTH},
-    ffi, PublicKey, Scalar, SecretKey, Signature,
+    ed25519::consts::{PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SIGNATURE_LENGTH},
+    ed25519::{self, PublicKey, Scalar, SecretKey, Signature},
+    ffi,
 };
 
 /// Driver ABI for dalek or donna impls
@@ -54,14 +55,14 @@ pub const DONNA: Driver = Driver {
 
 /// Dalek driver implementation (native rust)
 pub const DALEK: Driver = Driver {
-    ed25519_publickey: crate::dalek_ed25519_publickey,
-    ed25519_sign_open: crate::dalek_ed25519_sign_open,
-    ed25519_sign: crate::dalek_ed25519_sign,
-    ed25519_sign_open_batch: crate::dalek_ed25519_sign_open_batch,
-    curved25519_scalarmult_basepoint: crate::dalek_curved25519_scalarmult_basepoint,
-    curve25519_scalarmult: crate::dalek_curve25519_scalarmult,
-    ed25519_publickey_ext: crate::dalek_ed25519_publickey_ext,
-    ed25519_sign_ext: crate::dalek_ed25519_sign_ext,
+    ed25519_publickey: ed25519::dalek_ed25519_publickey,
+    ed25519_sign_open: ed25519::dalek_ed25519_sign_open,
+    ed25519_sign: ed25519::dalek_ed25519_sign,
+    ed25519_sign_open_batch: ed25519::dalek_ed25519_sign_open_batch,
+    curved25519_scalarmult_basepoint: ed25519::dalek_curved25519_scalarmult_basepoint,
+    curve25519_scalarmult: ed25519::dalek_curve25519_scalarmult,
+    ed25519_publickey_ext: ed25519::dalek_ed25519_publickey_ext,
+    ed25519_sign_ext: ed25519::dalek_ed25519_sign_ext,
 };
 
 pub struct Batch<const N: usize, const M: usize = 128> {

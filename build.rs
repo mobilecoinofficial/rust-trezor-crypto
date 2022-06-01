@@ -1,6 +1,10 @@
 use std::path::PathBuf;
 
 fn main() -> anyhow::Result<()> {
+
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=wrapper.h");
+
     // Build donna C bindings for testing
     #[cfg(feature = "build_donna")]
     build_bindings()?;
@@ -20,6 +24,7 @@ fn build_bindings() -> anyhow::Result<()> {
     // Generate bindings
     let bindings = bindgen::Builder::default()
         .clang_arg("-Ivendor/ed25519-donna")
+        .clang_arg("-Ivendor/curve25519-donna")
         //.clang_arg("--sysroot-/home/ryan/.arm-none-eabi/")
         .header("wrapper.h")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
@@ -59,6 +64,16 @@ fn build_lib() -> anyhow::Result<()> {
         .define("ED25519_TEST", "1")
         .warnings(false)
         .compile("libed25519_donna.a");
+
+    cc::Build::new()
+        .include("vendor/curve25519-donna")
+        .file("vendor/curve25519-donna/curve25519.c")
+        // Using reference hasher for ease, could swap to rust version
+        //.define("ED25519_REFHASH", "1")
+        .define("ED25519_TEST", "1")
+        .warnings(false)
+        .compile("libcurve25519_donna.a");
+
 
     Ok(())
 }

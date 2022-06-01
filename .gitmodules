@@ -1,3 +1,7 @@
 [submodule "vendor/ed25519-donna"]
 	path = vendor/ed25519-donna
 	url = https://github.com/floodyberry/ed25519-donna
+
+[submodule "vendor/curve25519-donna"]
+	path = vendor/curve25519-donna
+	url = https://github.com/floodyberry/curve25519-donna

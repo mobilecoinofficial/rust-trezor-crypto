@@ -6,7 +6,7 @@ extern crate test;
 
 extern crate libc;
 
-use trezor_crypto_lib::{test::*, PublicKey, Scalar, SecretKey, Signature};
+use trezor_crypto_lib::{test::*, ed25519::{PublicKey, Scalar, SecretKey, Signature}};
 
 /// Check key derivation functions are compatible
 #[test]

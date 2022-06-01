@@ -7,8 +7,11 @@
 // Include generated bindings
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-// Link donna library if enabled with feature `donna`
+// Link donna libraries if enabled with feature `donna`
 #[cfg_attr(feature = "build_donna", link(name = "ed25519_donna"))]
+extern "C" {}
+
+#[cfg_attr(feature = "build_donna", link(name = "curve25519_donna"))]
 extern "C" {}
 
 #[cfg_attr(feature = "build_donna", link(name = "c"))]

@@ -9,7 +9,7 @@ edition = "2021"
 readme = "README.md"
 license = "BSD-3-Clause"
 
-# NOTE: [lib] declaration required to ensure exports are not --gc-sections'd when compiling for external linking
+# NOTE: [lib] declaration seemingly required to ensure exports are not --gc-sections'd when compiled for external linking
 [lib]
 
 [features]
