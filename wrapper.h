@@ -54,3 +54,7 @@ typedef struct ge25519_niels_t {
 typedef struct ge25519_pniels_t {
 	bignum25519 ysubx, xaddy, z, t2d;
 } ge25519_pniels;
+
+typedef uint32_t bignum256modm_element_t;
+
+typedef bignum256modm_element_t bignum256modm[9];

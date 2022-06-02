@@ -47,3 +47,4 @@ rand_core = { version = "0.5.1", features = [ "std" ] }
 
 [patch.crates-io]
 ed25519-dalek = { path = "../ed25519-dalek" }
+curve25519-dalek = { path = "../curve25519-dalek" }

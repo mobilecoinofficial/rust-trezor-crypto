@@ -18,9 +18,9 @@ pub mod ed25519;
 
 #[cfg(feature="curve25519")]
 pub mod curve25519;
-#[cfg(feature="ge")]
+
 pub mod ge;
-#[cfg(feature="modm")]
+
 pub mod modm;
 
 

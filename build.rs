@@ -32,6 +32,7 @@ fn build_bindings() -> anyhow::Result<()> {
         .allowlist_type("ed25519_.*")
         .allowlist_type("curved25519_.*")
         .allowlist_type("ge25519_.*")
+        .allowlist_type("bignum.*")
         .allowlist_function("ed25519_.*")
         .allowlist_function("curve25519_.*")
         .allowlist_function("curved25519_.*")
