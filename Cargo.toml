@@ -46,4 +46,8 @@ libc = "0.2.126"
 rand_core = { version = "0.5.1", features = [ "std" ] }
 
 [patch.crates-io]
-ed25519-dalek = { path = "../ed25519-dalek" }
+
+# See https://github.com/dalek-cryptography/ed25519-dalek/pull/201
+#ed25519-dalek = { path = "../ed25519-dalek" }
+ed25519-dalek = { git = "https://github.com/ryankurte/ed25519-dalek", branch="feature/generic-digests" }
+
