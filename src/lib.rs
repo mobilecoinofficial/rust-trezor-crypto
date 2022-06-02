@@ -1,12 +1,9 @@
 //! A dalek cryptography based reproduction of the ed25519-donna API
 //!
 //! See:
-//!   - https://github.com/ryankurte/rust-dalek-donna
+//!   - https://github.com/ryankurte/rust-trezor-crypto
 
 #![cfg_attr(not(feature = "std"), no_std)]
-
-use cty::c_int;
-
 
 #[cfg(feature = "build_donna")]
 pub mod ffi;
@@ -18,8 +15,10 @@ pub mod ed25519;
 
 #[cfg(feature="curve25519")]
 pub mod curve25519;
+
 #[cfg(feature="ge")]
 pub mod ge;
+
 #[cfg(feature="modm")]
 pub mod modm;
 
@@ -35,5 +34,6 @@ pub type UInt = cty::c_uint;
 #[cfg(target_pointer_width = "64")]
 pub type UInt = cty::uint64_t;
 
+/// Alias for int on all platforms
 pub type Int = cty::c_int;
 

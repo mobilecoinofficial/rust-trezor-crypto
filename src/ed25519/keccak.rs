@@ -1,5 +1,5 @@
 
-use crate::{UInt, c_int};
+use crate::{UInt, Int};
 use super::{PublicKey, SecretKey, Signature};
 
 use sha3::Keccak512;
@@ -29,7 +29,7 @@ pub extern "C" fn dalek_ed25519_sign_open_keccak(
     mlen: UInt,
     pk: *mut PublicKey,
     sig: *mut Signature,
-) -> c_int {
+) -> Int {
     super::ed25519_sign_open::<Keccak512>(m, mlen, pk, sig)
 }
 

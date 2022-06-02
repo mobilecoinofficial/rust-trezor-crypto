@@ -2,7 +2,7 @@
 use curve25519_dalek::{constants::ED25519_BASEPOINT_TABLE, digest::{Digest, consts::U64}};
 use ed25519_dalek::{Signer, Verifier, Sha512};
 
-use crate::{UInt, c_int};
+use crate::{UInt, Int};
 
 // Constant lengths
 pub mod consts {
@@ -76,7 +76,7 @@ pub extern "C" fn dalek_ed25519_sign_open(
     mlen: UInt,
     pk: *mut PublicKey,
     sig: *mut Signature,
-) -> c_int {
+) -> Int {
     return ed25519_sign_open::<Sha512>(m, mlen, pk, sig);
 }
 
@@ -86,7 +86,7 @@ fn ed25519_sign_open<D: Digest<OutputSize=U64>>(
     mlen: UInt,
     pk: *mut PublicKey,
     sig: *mut Signature,
-) -> c_int {
+) -> Int {
     // Convert pointers into slices
     let (m, pk, sig) = unsafe {
         (
@@ -184,8 +184,8 @@ pub extern "C" fn dalek_ed25519_sign_open_batch(
     pk: *mut *const u8,
     rs: *mut *const u8,
     num: UInt,
-    valid: *mut c_int,
-) -> c_int {
+    valid: *mut Int,
+) -> Int {
     // Convert pointers into slices
     let (m, mlen, pk, rs, valid) = unsafe {
         (

@@ -12,9 +12,7 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     strategy:
       fail-fast: false
@@ -23,9 +21,6 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             use_cross: false
             test: true
-          - target: armv7-unknown-linux-gnueabihf
-            use_cross: true
-            test: false
           - target: thumbv7em-none-eabihf
             use_cross: true
             test: false
