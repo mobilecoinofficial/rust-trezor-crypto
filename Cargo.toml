@@ -17,7 +17,7 @@ std = [ ]
 u32_backend = [ "ed25519-dalek/u32_backend", "curve25519-dalek/u32_backend", "x25519-dalek/u32_backend" ]
 build_donna = []
 
-default = [ "std", "u32_backend", "build_donna" ]
+default = [ "std", "u32_backend", "build_donna", "curve25519-dalek/unstable_internals" ]
 
 [dependencies]
 cty = "0.2.2"
@@ -51,3 +51,5 @@ rand_core = { version = "0.5.1", features = [ "std" ] }
 #ed25519-dalek = { path = "../ed25519-dalek" }
 ed25519-dalek = { git = "https://github.com/ryankurte/ed25519-dalek", branch="feature/generic-digests" }
 
+curve25519-dalek = { path = "../curve25519-dalek" }
+#curve25519-dalek = { git = "https://github.com/ryankurte/ed25519-dalek", branch="feature/generic-digests" }

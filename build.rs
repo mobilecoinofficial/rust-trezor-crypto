@@ -21,10 +21,32 @@ fn main() -> anyhow::Result<()> {
 fn build_bindings() -> anyhow::Result<()> {
     let out_path = PathBuf::from(std::env::var("OUT_DIR").unwrap());
 
+    
+    // TODO: attempting (unsuccessfully so far) to extract static inline functions
+    // from the grasp of the donna headers...
+    #[cfg(nope)]
+    {
+    let files = &[
+        "ed25519-donna-impl-base.h",
+        "curve25519-donna-32bit.h",
+    ];
+
+    // Rewrite donna headers to drop static from defs
+    let p = PathBuf::from("vendor/ed25519-donna");
+    for f in files {
+        let s = std::fs::read_to_string(p.join(f))?;
+        let s = s.replace("DONNA_INLINE static ", "");
+        std::fs::write(out_path.join(f), s)?;
+    }
+    }
+
     // Generate bindings
     let bindings = bindgen::Builder::default()
+        .clang_arg(format!("-I{}", out_path.to_str().unwrap()))
         .clang_arg("-Ivendor/ed25519-donna")
         .clang_arg("-Ivendor/curve25519-donna")
+        .clang_arg("-DED25519_FORCE_32BIT")
+        .clang_arg("-DCURVE25519_FORCE_32BIT")
         //.clang_arg("--sysroot-/home/ryan/.arm-none-eabi/")
         .header("wrapper.h")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
@@ -36,6 +58,7 @@ fn build_bindings() -> anyhow::Result<()> {
         .allowlist_function("ed25519_.*")
         .allowlist_function("curve25519_.*")
         .allowlist_function("curved25519_.*")
+        .allowlist_function("ge25519_.*")
         // Array pointers in arguments neatens up the function definitions
         // but doesn't help with the mutability bug
         .array_pointers_in_arguments(true)
