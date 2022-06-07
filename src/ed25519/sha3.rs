@@ -1,6 +1,5 @@
-
-use crate::{UInt, Int};
-use super::{PublicKey, SecretKey, Signature, ed25519_sign};
+use super::{ed25519_sign, PublicKey, SecretKey, Signature};
+use crate::{Int, UInt};
 
 use sha3::Sha3_512;
 
@@ -33,11 +32,10 @@ pub extern "C" fn dalek_ed25519_sign_open_sha3(
     super::ed25519_sign_open::<Sha3_512>(m, mlen, pk, sig)
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::ed25519::*;
     use super::*;
+    use crate::ed25519::*;
 
     pub struct Driver {
         pub ed25519_publickey_sha3: unsafe extern "C" fn(*mut SecretKey, *mut PublicKey),

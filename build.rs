@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 fn main() -> anyhow::Result<()> {
-
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=wrapper.h");
 
@@ -21,23 +20,19 @@ fn main() -> anyhow::Result<()> {
 fn build_bindings() -> anyhow::Result<()> {
     let out_path = PathBuf::from(std::env::var("OUT_DIR").unwrap());
 
-    
     // TODO: attempting (unsuccessfully so far) to extract static inline functions
     // from the grasp of the donna headers...
     #[cfg(nope)]
     {
-    let files = &[
-        "ed25519-donna-impl-base.h",
-        "curve25519-donna-32bit.h",
-    ];
+        let files = &["ed25519-donna-impl-base.h", "curve25519-donna-32bit.h"];
 
-    // Rewrite donna headers to drop static from defs
-    let p = PathBuf::from("vendor/ed25519-donna");
-    for f in files {
-        let s = std::fs::read_to_string(p.join(f))?;
-        let s = s.replace("DONNA_INLINE static ", "");
-        std::fs::write(out_path.join(f), s)?;
-    }
+        // Rewrite donna headers to drop static from defs
+        let p = PathBuf::from("vendor/ed25519-donna");
+        for f in files {
+            let s = std::fs::read_to_string(p.join(f))?;
+            let s = s.replace("DONNA_INLINE static ", "");
+            std::fs::write(out_path.join(f), s)?;
+        }
     }
 
     // Generate bindings
@@ -101,7 +96,6 @@ fn build_lib() -> anyhow::Result<()> {
         .define("ED25519_TEST", "1")
         .warnings(false)
         .compile("libcurve25519_donna.a");
-
 
     Ok(())
 }

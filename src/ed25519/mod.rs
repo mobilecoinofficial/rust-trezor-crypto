@@ -1,8 +1,10 @@
+use curve25519_dalek::{
+    constants::ED25519_BASEPOINT_TABLE,
+    digest::{consts::U64, Digest},
+};
+use ed25519_dalek::{Sha512, Signer, Verifier};
 
-use curve25519_dalek::{constants::ED25519_BASEPOINT_TABLE, digest::{Digest, consts::U64}};
-use ed25519_dalek::{Signer, Verifier, Sha512};
-
-use crate::{UInt, Int};
+use crate::{Int, UInt};
 
 // Constant lengths
 pub mod consts {
@@ -31,11 +33,9 @@ pub type Signature = [u8; SIGNATURE_LENGTH];
 /// Scalar array
 pub type Scalar = [u8; SCALAR_LENGTH];
 
-
 pub mod keccak;
 
 pub mod sha3;
-
 
 /// Derives a public key from a private key using the default (Sha512) digest
 ///
@@ -46,7 +46,7 @@ pub extern "C" fn dalek_ed25519_publickey(sk: *mut SecretKey, pk: *mut PublicKey
 }
 
 /// Internal public key function, generic over digest types
-fn ed25519_publickey<D: Digest<OutputSize=U64>>(sk: *mut SecretKey, pk: *mut PublicKey) {
+fn ed25519_publickey<D: Digest<OutputSize = U64>>(sk: *mut SecretKey, pk: *mut PublicKey) {
     let (sk, pk) = unsafe { (&(*sk), &mut (*pk)) };
 
     // Parse out secret key
@@ -81,7 +81,7 @@ pub extern "C" fn dalek_ed25519_sign_open(
 }
 
 /// Internal verify function, generic over digest types
-fn ed25519_sign_open<D: Digest<OutputSize=U64>>(
+fn ed25519_sign_open<D: Digest<OutputSize = U64>>(
     m: *const u8,
     mlen: UInt,
     pk: *mut PublicKey,
@@ -119,7 +119,7 @@ fn ed25519_sign_open<D: Digest<OutputSize=U64>>(
 }
 
 /// Internal sign function, generic over digest types
-fn ed25519_sign<D: Digest<OutputSize=U64>>(
+fn ed25519_sign<D: Digest<OutputSize = U64>>(
     m: *const u8,
     mlen: UInt,
     sk: *mut SecretKey,

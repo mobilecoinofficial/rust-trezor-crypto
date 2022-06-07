@@ -14,22 +14,35 @@ license = "BSD-3-Clause"
 
 [features]
 std = [ ]
-u32_backend = [ "ed25519-dalek/u32_backend", "curve25519-dalek/u32_backend", "x25519-dalek/u32_backend" ]
 build_donna = []
 
-default = [ "std", "u32_backend", "build_donna", "curve25519-dalek/unstable_internals" ]
+default = [ "std", "build_donna" ]
 
 [dependencies]
 cty = "0.2.2"
 getrandom = { version = "0.2.6", default_features = false }
 static_assertions = "1.1.0"
 
-curve25519-dalek = { version = "3.2.1", default_features = false }
-ed25519-dalek = { version = "1.0.1", default_features = false }
-x25519-dalek = { version = "1.2.0", default_features = false }
-
 sha2 = { version = "0.9.9", default_features = false }
 sha3 = { version = "0.9.1", default_features = false }
+byteorder = { version = "1.4.3", default_features = false }
+
+[dependencies.curve25519-dalek]
+version = "3.2.1"
+features = [ "u32_backend", "unstable_internals" ]
+default_features = false
+
+[dependencies.ed25519-dalek]
+version = "1.0.1"
+features = [ "u32_backend" ]
+default_features = false
+
+
+[dependencies.x25519-dalek]
+version = "1.2.0"
+features = [ "u32_backend" ]
+default_features = false
+
 
 [build-dependencies]
 bindgen = "0.59.2"
@@ -47,9 +60,13 @@ rand_core = { version = "0.5.1", features = [ "std" ] }
 
 [patch.crates-io]
 
-# See https://github.com/dalek-cryptography/ed25519-dalek/pull/201
-#ed25519-dalek = { path = "../ed25519-dalek" }
-ed25519-dalek = { git = "https://github.com/ryankurte/ed25519-dalek", branch="feature/generic-digests" }
+# See https://github.com/ryankurte/curve25519-dalek/pull/1
 
 curve25519-dalek = { path = "../curve25519-dalek" }
 #curve25519-dalek = { git = "https://github.com/ryankurte/ed25519-dalek", branch="feature/generic-digests" }
+
+# See https://github.com/dalek-cryptography/ed25519-dalek/pull/201
+
+ed25519-dalek = { path = "../ed25519-dalek" }
+#ed25519-dalek = { git = "https://github.com/ryankurte/ed25519-dalek", branch="feature/generic-digests" }
+

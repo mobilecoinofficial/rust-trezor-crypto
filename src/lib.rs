@@ -13,13 +13,12 @@ pub mod test;
 
 pub mod ed25519;
 
-#[cfg(feature="curve25519")]
+#[cfg(feature = "curve25519")]
 pub mod curve25519;
 
 pub mod ge;
 
 pub mod modm;
-
 
 // Bindgen / cty have some weird behaviours when mapping `size_t` on different platforms.
 // use [`Uint`] in place of `cty::size_t` to avoid this.
@@ -34,4 +33,3 @@ pub type UInt = cty::uint64_t;
 
 /// Alias for int on all platforms
 pub type Int = cty::c_int;
-

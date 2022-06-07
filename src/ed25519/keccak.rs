@@ -1,6 +1,5 @@
-
-use crate::{UInt, Int};
 use super::{PublicKey, SecretKey, Signature};
+use crate::{Int, UInt};
 
 use sha3::Keccak512;
 
@@ -33,11 +32,10 @@ pub extern "C" fn dalek_ed25519_sign_open_keccak(
     super::ed25519_sign_open::<Keccak512>(m, mlen, pk, sig)
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::ed25519::*;
     use super::*;
+    use crate::ed25519::*;
 
     pub struct Driver {
         pub ed25519_publickey_keccak: unsafe extern "C" fn(*mut SecretKey, *mut PublicKey),
