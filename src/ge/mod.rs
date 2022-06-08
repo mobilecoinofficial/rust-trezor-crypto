@@ -8,7 +8,7 @@ use core::slice;
 use cty::{c_int, c_uchar, size_t};
 
 use curve25519_dalek::{
-    constants::{ED25519_BASEPOINT_TABLE, MONTGOMERY_A},
+    constants::{ED25519_BASEPOINT_TABLE, MONTGOMERY_A, SQRT_M1, MONTGOMERY_A_NEG},
     edwards::{CompressedEdwardsY, EdwardsPoint},
     scalar::Scalar,
     internals::FieldElement2625,
@@ -220,7 +220,7 @@ pub unsafe extern "C" fn ge25519_copy(r: *mut Ge25519, p: *const Ge25519) {
     (*r).t = (*p).t;
 }
 
-// Point from sha512 hash (field element?) in variable time
+// Point from sha3 keccak hash (field element?) in variable time
 // TODO: is this what the xmr folks are -trying- to do..?
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_from_hash_sha3k_vartime(
@@ -236,6 +236,7 @@ pub unsafe extern "C" fn ge25519_from_hash_sha3k_vartime(
 }
 
 // Point from [hash] (field element?) in variable time
+// TODO(@ryankurte): what is this -actually- doing / is this duplicating some common cryptographic operation?
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
     r: *mut Ge25519,
@@ -273,25 +274,94 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
     // curve25519_add_reduce(x, x, y);
     let x = &x + &y;
 
+    // TODO: Where does M come from?1!
     // curve25519_divpowm1(r->x, w, x); /* (w / x)^(m + 1) */ ?!
-    let r_x = FieldElement2625::zero();
+    // alt: x = uv^3(uv^7)^((q-5)/8) ?
 
+    let (r_x_is_neg, mut r_x) = FieldElement2625::sqrt_ratio_i(
+        &(&w * &x.invert()),
+        &FieldElement2625::one(),
+    );
 
     // curve25519_square(y, r->x);
+    let y = r_x.square();
     
 	// curve25519_mul(x, y, x);
+    let x = &y * &x;
     
 	// curve25519_sub_reduce(y, w, x);
+    let mut y = &w - &x;
     
 	// curve25519_copy(z, fe_ma);
+    let mut z = MONTGOMERY_A;
+
+    let mut negative = false;
+    let mut sign = 0;
+
+    let two = &FieldElement2625::one() + &FieldElement2625::one();
+
     
 
 
+    if &y != &FieldElement2625::zero() {
+        y = &w + &x;
 
+        if &y != &FieldElement2625::zero() {
+            negative = true;
+        } else {
+
+            let (_, temp1) = FieldElement2625::sqrt_ratio_i(
+                &two.negate() * &MONTGOMERY_A * (&MONTGOMERY_A + &two),
+                &FieldElement2625::one(),
+            );
+
+            r_x = &(&r_x * &FieldElement2625::minus_one()) * &temp1;
+            negative = false;
+        }
+
+    } else {
+
+        let (_, temp2) = FieldElement2625::sqrt_ratio_i(
+            &two * &MONTGOMERY_A * (&MONTGOMERY_A + &two),
+            &FieldElement2625::one(),
+        );
+
+        r_x = &(&r_x * &FieldElement2625::minus_one()) * &temp2;
+    }
+
+    if !negative {
+        r_x = &r_x * &u;
+        z = &MONTGOMERY_A_NEG * &u.square2();
+        sign = 0;
+
+    } else {
+        z = MONTGOMERY_A_NEG;
+        x = &x * &SQRT_M1;
+        y = &w - &x;
+
+        if &y != &FieldElement2625::zero() {
+            let (_, temp3) = FieldElement2625::sqrt_ratio_i(
+                FieldElement2625::minus_one() * &SQRT_M1 * &MONTGOMERY_A * (&MONTGOMERY_A + &two),
+                &FieldElement2625::one(),
+            );
+
+            r_x = &(&r_x * &FieldElement2625::one()) * &temp3;
+            
+        } else {
+            let (_, temp4) = FieldElement2625::sqrt_ratio_i(
+                &SQRT_M1 * &MONTGOMERY_A * (&MONTGOMERY_A + &two),
+                &FieldElement2625::one(),
+            );
+
+            r_x = &(&r_x * &FieldElement2625::minus_one()) * &temp4;
+        }
+
+        sign = 1;
+    }
+
+    //*r = Ge25519{x, y, z, }
 
     //(*r) = Ge25519::from(&r1);
-
-    // TODO(@ryankurte): what is this -actually- doing / is this duplicating some common cryptographic operation?
 }
 
 // computes [s1]p1, constant time
