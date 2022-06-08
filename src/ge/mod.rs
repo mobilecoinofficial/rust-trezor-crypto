@@ -8,10 +8,12 @@ use core::slice;
 use cty::{c_int, c_uchar, size_t};
 
 use curve25519_dalek::{
-    constants::ED25519_BASEPOINT_TABLE,
+    constants::{ED25519_BASEPOINT_TABLE, MONTGOMERY_A},
     edwards::{CompressedEdwardsY, EdwardsPoint},
     scalar::Scalar,
+    internals::FieldElement2625,
 };
+use sha3::{Keccak512};
 
 use crate::modm::{Bignum25519, Bignum256Modm};
 
@@ -218,24 +220,78 @@ pub unsafe extern "C" fn ge25519_copy(r: *mut Ge25519, p: *const Ge25519) {
     (*r).t = (*p).t;
 }
 
-// Point from [hash] in variable time
+// Point from sha512 hash (field element?) in variable time
+// TODO: is this what the xmr folks are -trying- to do..?
+#[no_mangle]
+pub unsafe extern "C" fn ge25519_from_hash_sha3k_vartime(
+    r: *mut Ge25519,
+    data: *mut u8,
+    len: usize,
+) {
+    let buff = slice::from_raw_parts(data, len);
+
+    let p = EdwardsPoint::hash_from_bytes::<Keccak512>(buff);
+
+    *r = Ge25519::from(&p);
+}
+
+// Point from [hash] (field element?) in variable time
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
     r: *mut Ge25519,
     p: *const [u8; 32],
-) -> c_int {
-    let c1 = CompressedEdwardsY(*p);
+) {
 
-    let r1 = match c1.decompress() {
-        Some(v) => v,
-        None => return 0,
-    };
+    // Zmod(2^255-19) from byte array to bignum25519 ([u32; 10]) expansion with modular reduction
+    let u = FieldElement2625::from_bytes(&*p);
 
-    (*r) = Ge25519::from(&r1);
+    // Check input is canonical
+    // TODO: what else do we need here..?
+    // curve25519_expand_reduce(u, s);
+    if *p != u.to_bytes() {
+        return;
+    }
 
-    // TODO(@ryankurte): what is this -actually- doing that is different from ge25519_unpack_vartime?
+    // v = 2 * u^2
+    // curve25519_square(v, u);
+    // curve25519_add_reduce(v, v, v);
+    let v = u.square2();
+    
+    // w = v + 1 = (2 * u^2) + 1
+    // curve25519_set(w, 1);
+	// curve25519_add_reduce(w, v, w);
+    let w = &v + &FieldElement2625::one();
 
-    return 0;
+    // x = w ^ 2
+    let x = w.square();
+
+    // y = (-1 * A^2) * v = -2 * A^2 * u^2
+    // curve25519_mul(y, fe_ma2, v);
+    let y = FieldElement2625::minus_one() * MONTGOMERY_A.square() * v;
+
+    // x = w^2 - 2 * A^2 * u^2
+    // curve25519_add_reduce(x, x, y);
+    let x = &x + &y;
+
+    // curve25519_divpowm1(r->x, w, x); /* (w / x)^(m + 1) */ ?!
+    let r_x = FieldElement2625::zero();
+
+
+    // curve25519_square(y, r->x);
+    
+	// curve25519_mul(x, y, x);
+    
+	// curve25519_sub_reduce(y, w, x);
+    
+	// curve25519_copy(z, fe_ma);
+    
+
+
+
+
+    //(*r) = Ge25519::from(&r1);
+
+    // TODO(@ryankurte): what is this -actually- doing / is this duplicating some common cryptographic operation?
 }
 
 // computes [s1]p1, constant time
