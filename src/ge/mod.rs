@@ -245,15 +245,16 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
 ) {
 
     // Zmod(2^255-19) from byte array to bignum25519 ([u32; 10]) expansion with modular reduction
-    let mut u = FieldElement2625::from_bytes(&*p);
+    let u = FieldElement2625::from_bytes(&*p);
 
-    // Check input is canonical
+    // TODO: Check input is canonical
     // curve25519_expand_reduce(u, s);
+    //let mut u = expand_reduce(&*p);
 
     // TODO: non-canonical inputs give invalid results..? 
     if *p != u.to_bytes() {
         println!("Non-canonical input");
-        u = FieldElement2625::from_bytes(&u.to_bytes());
+        //u = FieldElement2625::from_bytes(&u.to_bytes());
         //return;
     }
 
@@ -375,11 +376,14 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
     // rx = rx * rz % q
     let rx = &rx * &rz;
 
+    let rt = &rx * &ry;
+
     let p = EdwardsPoint::try_from_raw_u32(
         *rx.as_ref(),
         *ry.as_ref(),
         *rz.as_ref(),
-        [0u32; 10],
+        // TODO: i -think- this torsion part is incorrect?
+        *rt.as_ref(),
     ).unwrap();
 
     // TODO: compress, work out whether mul8 is included in test vectors?
@@ -476,6 +480,15 @@ pub unsafe extern "C" fn ed25519_verify(
         _ => 0,
     }
 }
+
+// TODO: expand reduce helper, not sure what this is -meant- to be doing yet...
+fn expand_reduce(r: &[u8; 32]) -> FieldElement2625 {
+
+    let f1 = FieldElement2625::from_bytes(r);
+
+    FieldElement2625::from_bytes(&f1.to_bytes())
+}
+
 
 #[cfg(test)]
 mod test {
@@ -689,22 +702,27 @@ mod test {
             "a8587a5ef6900fa8e32d6affbd8090b1e33e694284323fffff02d69865f2bc7f",
         )];
 
+        let mut errors = 0;
+
         for (_i, expected) in tests {
+
+            println!("input:  {}", _i);
+            println!("expect: {}", expected);
+
             let i = decode_bytes::<32>(_i);
 
             let r = expand_reduce(&i);
 
             let result_hex = hex::encode(r.to_bytes());
 
-            assert_eq!(expected, &result_hex);
+            println!("result: {}\r\n", result_hex);
+
+            if &result_hex != expected {
+                errors += 2;
+            }
         }
+
+        assert!(errors == 0, "{}/{} tests failed", errors, tests.len());
     }
 
-    fn expand_reduce(r: &[u8; 32]) -> FieldElement2625 {
-
-        let f1 = FieldElement2625::from_bytes(&r);
-        let f2 = FieldElement2625::from_bytes(&f1.to_bytes());
-
-        f2
-    }
 }
