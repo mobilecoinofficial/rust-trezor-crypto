@@ -26,6 +26,7 @@ static_assertions = "1.1.0"
 sha2 = { version = "0.9.9", default_features = false }
 sha3 = { version = "0.9.1", default_features = false }
 byteorder = { version = "1.4.3", default_features = false }
+subtle = "2.4.1"
 
 [dependencies.curve25519-dalek]
 version = "3.2.1"

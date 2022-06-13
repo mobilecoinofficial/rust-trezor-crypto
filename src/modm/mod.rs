@@ -6,6 +6,7 @@ pub type Bignum25519 = [u32; 10];
 
 pub type Bignum256Modm = [u32; 9];
 
+
 //ok &= iszero256_modm(x) ^ 1;
 //barrett_reduce256_modm(t, z, x);
 //ok &= eq256_modm(t, x);
@@ -80,7 +81,7 @@ pub unsafe extern "C" fn add256_modm(
 ) {
     let (x, y) = (Scalar::from_unpacked_u32(*x), Scalar::from_unpacked_u32(*y));
 
-    *r = (x + y).to_unpacked_u32();
+    *r = (x + y).reduce().to_unpacked_u32();
 }
 
 #[no_mangle]
@@ -91,7 +92,7 @@ pub unsafe extern "C" fn sub256_modm(
 ) {
     let (x, y) = (Scalar::from_unpacked_u32(*x), Scalar::from_unpacked_u32(*y));
 
-    *r = (x - y).to_unpacked_u32();
+    *r = (x - y).reduce().to_unpacked_u32();
 }
 
 #[no_mangle]
@@ -102,7 +103,7 @@ pub unsafe extern "C" fn mul256_modm(
 ) {
     let (x, y) = (Scalar::from_unpacked_u32(*x), Scalar::from_unpacked_u32(*y));
 
-    *r = (x * y).to_unpacked_u32();
+    *r = (x * y).reduce().to_unpacked_u32();
 }
 
 #[no_mangle]
@@ -123,7 +124,7 @@ pub unsafe extern "C" fn mulsub256_modm(
         Scalar::from_unpacked_u32(*c),
     );
 
-    *r = (c - a * b).to_unpacked_u32();
+    *r = (c - a * b).reduce().to_unpacked_u32();
 }
 
 #[no_mangle]
@@ -139,9 +140,10 @@ pub unsafe extern "C" fn muladd256_modm(
         Scalar::from_unpacked_u32(*c),
     );
 
-    *r = (c + a * b).to_unpacked_u32();
+    *r = (c + a * b).reduce().to_unpacked_u32();
 }
 
+/// [`expand256_modm`] from [modm-donna-32bit.c:208](https://github.com/floodyberry/ed25519-donna/blob/8757bd4cd209cb032853ece0ce413f122eef212c/modm-donna-32bit.h#L208)
 #[no_mangle]
 pub unsafe extern "C" fn expand256_modm(o: *mut Bignum256Modm, i: *const u8, len: usize) {
     let mut raw = [0u8; 32];
@@ -150,9 +152,10 @@ pub unsafe extern "C" fn expand256_modm(o: *mut Bignum256Modm, i: *const u8, len
     raw.copy_from_slice(i);
 
     let s = Scalar::from_bytes_mod_order(raw);
-    *o = s.to_unpacked_u32();
+    *o = s.reduce().to_unpacked_u32();
 }
 
+/// [`expand_raw256_modm`] from [modm-donna-32bit.c:261](https://github.com/floodyberry/ed25519-donna/blob/8757bd4cd209cb032853ece0ce413f122eef212c/modm-donna-32bit.h#L261)
 #[no_mangle]
 pub unsafe extern "C" fn expand_raw256_modm(o: *mut Bignum256Modm, i: *const [u8; 32usize]) {
     let s = Scalar::from_bytes_mod_order(*i);
@@ -161,7 +164,7 @@ pub unsafe extern "C" fn expand_raw256_modm(o: *mut Bignum256Modm, i: *const [u8
 
 #[no_mangle]
 pub unsafe extern "C" fn contract256_modm(o: *mut [u8; 32], i: *const Bignum256Modm) {
-    let s = Scalar::from_unpacked_u32(*i);
+    let s = Scalar::from_unpacked_u32(*i).reduce();
     *o = s.to_bytes();
 }
 

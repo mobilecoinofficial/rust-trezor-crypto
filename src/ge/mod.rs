@@ -4,11 +4,12 @@
 //!
 
 use core::slice;
+use std::f32::MIN;
 
 use cty::{c_int, c_uchar, size_t};
 
 use curve25519_dalek::{
-    constants::{ED25519_BASEPOINT_TABLE, MONTGOMERY_A, SQRT_M1, MONTGOMERY_A_NEG},
+    constants::{ED25519_BASEPOINT_TABLE, MONTGOMERY_A, SQRT_M1, MONTGOMERY_A_NEG, MINUS_ONE},
     edwards::{CompressedEdwardsY, EdwardsPoint},
     scalar::Scalar,
     internals::FieldElement2625,
@@ -234,9 +235,9 @@ pub unsafe extern "C" fn ge25519_from_hash_sha3k_vartime(
 
     *r = Ge25519::from(&p);
 }
-
 // Point from [hash] (field element?) in variable time
 // TODO(@ryankurte): what is this -actually- doing / is this duplicating some common cryptographic operation?
+//#[cfg(nope)]
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
     r: *mut Ge25519,
@@ -244,127 +245,151 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
 ) {
 
     // Zmod(2^255-19) from byte array to bignum25519 ([u32; 10]) expansion with modular reduction
-    let u = FieldElement2625::from_bytes(&*p);
+    let mut u = FieldElement2625::from_bytes(&*p);
 
     // Check input is canonical
-    // TODO: what else do we need here..?
     // curve25519_expand_reduce(u, s);
+
+    // TODO: non-canonical inputs give invalid results..? 
     if *p != u.to_bytes() {
-        return;
+        println!("Non-canonical input");
+        u = FieldElement2625::from_bytes(&u.to_bytes());
+        //return;
     }
 
-    // v = 2 * u^2
-    // curve25519_square(v, u);
-    // curve25519_add_reduce(v, v, v);
-    let v = u.square2();
-    
-    // w = v + 1 = (2 * u^2) + 1
-    // curve25519_set(w, 1);
-	// curve25519_add_reduce(w, v, w);
-    let w = &v + &FieldElement2625::one();
+    // w = (2 * u * u + 1) % q
+    let w = &u.square2() + &FieldElement2625::one();
 
-    // x = w ^ 2
-    let x = w.square();
+    // xp = (w *  w - 2 * A * A * u * u) % q
+    let xp = &w.square() - &(&MONTGOMERY_A.square2() * &u.square());
 
-    // y = (-1 * A^2) * v = -2 * A^2 * u^2
-    // curve25519_mul(y, fe_ma2, v);
-    let y = FieldElement2625::minus_one() * MONTGOMERY_A.square() * v;
+    // rx = ed25519.expmod(w * ed25519.inv(xp),(q+3)/8,q) 
+    let mut rx = (&w * &xp.invert()).pow_p58();
 
-    // x = w^2 - 2 * A^2 * u^2
-    // curve25519_add_reduce(x, x, y);
-    let x = &x + &y;
 
-    // TODO: Where does M come from?1!
-    // curve25519_divpowm1(r->x, w, x); /* (w / x)^(m + 1) */ ?!
-    // alt: x = uv^3(uv^7)^((q-5)/8) ?
+    // x = rx * rx * (w * w - 2 * A * A * u * u) % q
+    let mut x = &rx.square() * &xp;
 
-    let (r_x_is_neg, mut r_x) = FieldElement2625::sqrt_ratio_i(
-        &(&w * &x.invert()),
-        &FieldElement2625::one(),
-    );
-
-    // curve25519_square(y, r->x);
-    let y = r_x.square();
-    
-	// curve25519_mul(x, y, x);
-    let x = &y * &x;
-    
-	// curve25519_sub_reduce(y, w, x);
+    // y = (2 * u * u  + 1 - x) % q #w - x, if y is zero, then x = w
     let mut y = &w - &x;
-    
-	// curve25519_copy(z, fe_ma);
-    let mut z = MONTGOMERY_A;
 
-    let mut negative = false;
-    let mut sign = 0;
+    let mut z = FieldElement2625::zero();
+
 
     let two = &FieldElement2625::one() + &FieldElement2625::one();
+    let minus_two = &FieldElement2625::zero() - &two;
 
-    
+
+    let fffb1 = &MINUS_ONE * &FieldElement2625::sqrt_ratio_i(
+        &(&(&minus_two * &MONTGOMERY_A) * &(&MONTGOMERY_A + &two)),
+        &FieldElement2625::one(),
+    ).1;
+
+    let fffb2 = &MINUS_ONE * &FieldElement2625::sqrt_ratio_i(
+        &(&(&two * &MONTGOMERY_A) * &(&MONTGOMERY_A + &two)),
+        &FieldElement2625::one(),
+    ).1;
+
+    let fffb3 = &FieldElement2625::sqrt_ratio_i(
+        &(&(&MINUS_ONE * &(&SQRT_M1 * &MONTGOMERY_A)) * &(&MONTGOMERY_A + &two)),
+        &FieldElement2625::one(),
+    ).1;
+
+    let fffb4 = &MINUS_ONE * &FieldElement2625::sqrt_ratio_i(
+        &(&(&SQRT_M1 * &MONTGOMERY_A) * &(&MONTGOMERY_A + &two)),
+        &FieldElement2625::one(),
+    ).1;
 
 
-    if &y != &FieldElement2625::zero() {
+    let mut negative = false;
+
+    if y != FieldElement2625::zero() {
+        // Check if we have negative square root
         y = &w + &x;
-
-        if &y != &FieldElement2625::zero() {
+        if y != FieldElement2625::zero() {
             negative = true;
+
         } else {
+            // rx = rx * -1 * ed25519.sqroot(-2 * A * (A + 2) ) % q
+            rx = &rx * &fffb1;
 
-            let (_, temp1) = FieldElement2625::sqrt_ratio_i(
-                &two.negate() * &MONTGOMERY_A * (&MONTGOMERY_A + &two),
-                &FieldElement2625::one(),
-            );
-
-            r_x = &(&r_x * &FieldElement2625::minus_one()) * &temp1;
             negative = false;
         }
 
+        println!("Non zero!");
+        
     } else {
+        // y was 0
+        // rx = (rx * -1 * ed25519.sqroot(2 * A * (A + 2) ) ) % q 
+        rx = &rx * &fffb2;
 
-        let (_, temp2) = FieldElement2625::sqrt_ratio_i(
-            &two * &MONTGOMERY_A * (&MONTGOMERY_A + &two),
-            &FieldElement2625::one(),
-        );
-
-        r_x = &(&r_x * &FieldElement2625::minus_one()) * &temp2;
+        println!("Zero~!");
     }
+
+    let mut sign = 0;
 
     if !negative {
-        r_x = &r_x * &u;
+        // rx = (rx * u) % q
+        rx = &rx * &u;
+        // z = (-2 * A * u * u)  % q
         z = &MONTGOMERY_A_NEG * &u.square2();
+
         sign = 0;
 
+        println!("Not negative!");
+
     } else {
+        // z = -1 * A
         z = MONTGOMERY_A_NEG;
+        // x = x * sqrtm1 % q 
         x = &x * &SQRT_M1;
+        // y = (w - x) % q 
         y = &w - &x;
 
-        if &y != &FieldElement2625::zero() {
-            let (_, temp3) = FieldElement2625::sqrt_ratio_i(
-                FieldElement2625::minus_one() * &SQRT_M1 * &MONTGOMERY_A * (&MONTGOMERY_A + &two),
-                &FieldElement2625::one(),
-            );
-
-            r_x = &(&r_x * &FieldElement2625::one()) * &temp3;
-            
+        if y != FieldElement2625::zero() {
+            // rx = rx * ed25519.sqroot( -1 * sqrtm1 * A * (A + 2)) % q
+            rx = &rx * &fffb3;
         } else {
-            let (_, temp4) = FieldElement2625::sqrt_ratio_i(
-                &SQRT_M1 * &MONTGOMERY_A * (&MONTGOMERY_A + &two),
-                &FieldElement2625::one(),
-            );
-
-            r_x = &(&r_x * &FieldElement2625::minus_one()) * &temp4;
+            // rx = rx * -1 * ed25519.sqroot( sqrtm1 * A * (A + 2)) % q
+            rx = &rx * &fffb4;
         }
-
+            
         sign = 1;
+
+        println!("Negative!");
+    }
+    
+    // if ( (rx % 2) != sign ):
+    // TODO: is this direction correct?
+    if rx.is_negative().unwrap_u8() != sign {
+        // rx =  - (rx) % q 
+        rx.negate();
+
+        println!("Negated!");
     }
 
-    //*r = Ge25519{x, y, z, }
+    // rz = (z + w) % q
+    let rz = &z + &w;
+    // ry = (z - w) % q
+    let ry = &z - &w;
+    // rx = rx * rz % q
+    let rx = &rx * &rz;
 
-    //(*r) = Ge25519::from(&r1);
+    let p = EdwardsPoint::try_from_raw_u32(
+        *rx.as_ref(),
+        *ry.as_ref(),
+        *rz.as_ref(),
+        [0u32; 10],
+    ).unwrap();
+
+    // TODO: compress, work out whether mul8 is included in test vectors?
+    //let p = p.mul_by_cofactor();
+    
+    *r = Ge25519::from(&p);
 }
 
-// computes [s1]p1, constant time
+
+// r = [s1]p1, constant time
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_scalarmult(
     r: *mut Ge25519,
@@ -414,6 +439,7 @@ pub unsafe extern "C" fn ge25519_check(p1: *const Ge25519) -> c_int {
     }
 }
 
+/// Check if `a` == `b`
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_eq(a: *const Ge25519, b: *const Ge25519) -> c_int {
     let (p1, p2) = match (EdwardsPoint::try_from(&*a), EdwardsPoint::try_from(&*b)) {
@@ -486,7 +512,7 @@ mod test {
 
     /// `test_encoding` from test_apps.monero.crypto.py
     #[test]
-    fn encoding() {
+    fn encode_decode() {
         let tests = &["2486224797d05cae3cba4be043be2db0df381f3f19cfa113f86ab38e3d8d2bd0"];
 
         for t in tests {
@@ -573,5 +599,112 @@ mod test {
 
             assert_eq!(compressed_res, exp);
         }
+    }
+
+    #[test]
+    fn test_ge25519_fromfe_frombytes_vartime() {
+        
+        let tests = &[
+        // Vectors from trezor-firmware `test_apps.monero.crypto.py`
+        #[cfg(nope)]
+        (
+            "42f6835bf83114a1f5f6076fe79bdfa0bd67c74b88f127d54572d3910dd09201",
+            "54863a0464c008acc99cffb179bc6cf34eb1bbdf6c29f7a070a7c6376ae30ab5",
+        ),
+        // Vectors from monero `tests/crypto/tests.txt`
+        // https://github.com/monero-project/monero/blob/release-v0.13/tests/crypto/tests.txt
+        (
+            "83efb774657700e37291f4b8dd10c839d1c739fd135c07a2fd7382334dafdd6a","2789ecbaf36e4fcb41c6157228001538b40ca379464b718d830c58caae7ea4ca",
+        ), (
+            "5c380f98794ab7a9be7c2d3259b92772125ce93527be6a76210631fdd8001498", "31a1feb4986d42e2137ae061ea031838d24fa523234954cf8860bcd42421ae94",
+        ), (
+            "036291b42946c45b627a83701184f7d41647779cf5475d39e029443be33acacc",
+            "ccc370b8bd978dc2d096eede50271c16922994b97959a9bd0171aaf5d4eb981f",
+        ),(
+            "fff86285af4a9e8f777fb16723fea046207e0c5949934836acb43a36360ec7eb",
+            "98fc4d1c6077c21c2993bcd7abb0af6b4daaa4c2fdea13eb4cd5ad5f7ce0de6f",
+        ),(
+            "7ed5a8182b8c79f553a101ef17df87dd45870821d53fbb00dd4d5b2a52f0effc",
+            "0ea13276d187cffa25955e3c49cf72244bbe8c1d3b72a1f5f0502139970f106e",
+        ),(
+            "4c60069c56d10bb3edc4dfe98d73f39456d846d4139fd3adaffd198e5009bdda",
+            "2097cd5377111642d9d7b96980a316e5227a4ed0f989232d09f1268048282a6e",
+        ),(
+            "176b82d6d68b0b906da1e992f5010f23b25d36112d8987d52e514ceeb8010e3d",
+            "3c8abee0fefa206c3631bf8c3208593afda93fa8a1ef75355ae05b3fe41c2749",
+        ),(
+            "72aa89d776c6bc7bd09385ac7e8112868f85025fa966bb5df65bbbd5c63a13c6",
+            "dfb5f593f9e78041c63f784e6db5f902d98ecfa3bd3668f8baa56062cc9e9e35",
+        ),(
+            "abfb4aef4ed3277ddbcb0bf13fc54faa8e161ce9b58c625d4523fc050e67e991",
+            "746f5b282beda0f831a7cb453bc5727cfc70d01227a109fb26a62d06f09ade3e",
+        ),(
+            "433ea849299a1e5f0ba7a47f2446104f892101945d4179e9048192bbc8f59af6",
+            "f647b5caf04c090bf1ed6261154ce7a50449e17fa1d547fe6c21b03b7eab73c5",
+        )];
+
+        let mut i = 0;
+        let mut failures = 0;
+
+        for (_h, _p) in tests {
+            let h = decode_bytes(_h);
+            let p = decode_bytes::<32>(_p);
+
+            println!("\r\niteration {}", i);
+            i += 1;
+
+            println!("hash: {}", _h);
+            println!("expected: {}", _p);
+
+            // Compute point from hash
+            let mut res = Ge25519::default();
+            unsafe { ge25519_fromfe_frombytes_vartime(&mut res, &h) };
+
+            // Pack result point
+            let mut compressed_res = [0u8; 32];
+            unsafe { ge25519_pack(&mut compressed_res, &res) };
+
+            println!("result: {}", hex::encode(compressed_res));
+
+            // Check results match
+            //assert_eq!(compressed_res, p);
+            if compressed_res != p {
+                failures += 1;
+            }
+        }
+
+        assert!(failures == 0, "{}/{} test cases failed", failures, tests.len());
+    }
+
+    #[test]
+    fn test_expand_reduce() {
+        let tests = &[(
+            "95587a5ef6900fa8e32d6a41bd8090b1e33e694284323d1d1f02d69865f2bc15",
+            "95587a5ef6900fa8e32d6a41bd8090b1e33e694284323d1d1f02d69865f2bc15"
+        ), (
+            "95587a5ef6900fa8e32d6a41bd8090b1e33e694284323d1d1f02d69865f2bcff",
+            "a8587a5ef6900fa8e32d6a41bd8090b1e33e694284323d1d1f02d69865f2bc7f",
+        ), (
+            "95587a5ef6900fa8e32d6affbd8090b1e33e694284323fffff02d69865f2bcff",
+            "a8587a5ef6900fa8e32d6affbd8090b1e33e694284323fffff02d69865f2bc7f",
+        )];
+
+        for (_i, expected) in tests {
+            let i = decode_bytes::<32>(_i);
+
+            let r = expand_reduce(&i);
+
+            let result_hex = hex::encode(r.to_bytes());
+
+            assert_eq!(expected, &result_hex);
+        }
+    }
+
+    fn expand_reduce(r: &[u8; 32]) -> FieldElement2625 {
+
+        let f1 = FieldElement2625::from_bytes(&r);
+        let f2 = FieldElement2625::from_bytes(&f1.to_bytes());
+
+        f2
     }
 }
