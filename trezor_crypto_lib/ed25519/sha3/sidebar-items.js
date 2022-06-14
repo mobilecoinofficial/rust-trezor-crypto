@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["dalek_ed25519_publickey_sha3","Derives a public key from a private key using sha3 digest"],["dalek_ed25519_sign_open_sha3","Verifies a message using the provided secret key using sha3 digest"],["dalek_ed25519_sign_sha3","Signs a message using the provided secret key using sha3 digest"]]});

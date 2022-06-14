@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["dalek_ed25519_publickey_keccak","Derives a public key from a private key using keccak digest"],["dalek_ed25519_sign_keccak","Signs a message using the provided secret key using keccak digest"],["dalek_ed25519_sign_open_keccak","Verifies a message using the provided secret key using keccak digest"]]});

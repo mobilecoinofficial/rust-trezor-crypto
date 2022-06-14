@@ -1,0 +1,1 @@
+window.ALL_CRATES = ["trezor_crypto_lib"];

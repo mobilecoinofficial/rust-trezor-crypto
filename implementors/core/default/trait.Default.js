@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["trezor_crypto_lib"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/default/trait.Default.html\" title=\"trait core::default::Default\">Default</a> for <a class=\"struct\" href=\"trezor_crypto_lib/ge/struct.Ge25519.html\" title=\"struct trezor_crypto_lib::ge::Ge25519\">Ge25519</a>","synthetic":false,"types":["trezor_crypto_lib::ge::Ge25519"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

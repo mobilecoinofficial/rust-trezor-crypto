@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["DALEK","Dalek driver implementation (native rust)"],["DONNA","Donna driver implementation (via FFI)"]],"struct":[["Batch",""],["Driver","Driver ABI for dalek or donna impls"]]});
