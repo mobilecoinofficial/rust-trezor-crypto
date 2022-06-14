@@ -1,9 +1,9 @@
-//! A dalek cryptography based reproduction of the ed25519-donna API
-//!
-//! See:
-//!   - https://github.com/ryankurte/rust-trezor-crypto
+//! A rust implementation of the trezor-crypto library
+//! 
+//! See <https://github.com/ryankurte/rust-trezor-crypto>
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![feature(doc_cfg)]
 
 #[cfg(feature = "build_donna")]
 pub mod ffi;
@@ -12,9 +12,6 @@ pub mod ffi;
 pub mod test;
 
 pub mod ed25519;
-
-#[cfg(feature = "curve25519")]
-pub mod curve25519;
 
 pub mod ge;
 

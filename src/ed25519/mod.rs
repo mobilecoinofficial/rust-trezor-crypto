@@ -1,3 +1,7 @@
+//! Curve25519 operations over `sha512` (default), [`keccak`], and [`sha3`].
+//! 
+//! These functions are ABI compatible with those provided by `donna`, with the addition of a `dalek_` prefix to allow linking both implementations for testing.
+
 use curve25519_dalek::{
     constants::ED25519_BASEPOINT_TABLE,
     digest::{consts::U64, Digest},
@@ -6,7 +10,7 @@ use ed25519_dalek::{Sha512, Signer, Verifier};
 
 use crate::{Int, UInt};
 
-// Constant lengths
+/// Common constants
 pub mod consts {
     pub const PUBLIC_KEY_LENGTH: usize = 32;
     pub const SECRET_KEY_LENGTH: usize = 32;
@@ -21,23 +25,25 @@ pub mod consts {
 
 use consts::*;
 
-/// PublicKey array
+/// Ed25519 Public Key, compatible with donna's `typedef unsigned char ed25519_public_key[32]`
 pub type PublicKey = [u8; PUBLIC_KEY_LENGTH];
 
-/// SecretKey array
+/// Ed25519 Secret Key, compatible with donna's `typedef unsigned char ed25519_secret_key[32]`
 pub type SecretKey = [u8; SECRET_KEY_LENGTH];
 
-/// Signature array
+/// Ed25519 Signature, compatible with donna's `typedef unsigned char ed25519_signature[64];`
 pub type Signature = [u8; SIGNATURE_LENGTH];
 
-/// Scalar array
+/// Ed25519 Scalar, compatible with donna's `typedef unsigned char curved25519_key[32]`
 pub type Scalar = [u8; SCALAR_LENGTH];
+
 
 pub mod keccak;
 
 pub mod sha3;
 
-/// Derives a public key from a private key using the default (Sha512) digest
+
+/// Derives a public key from a private key (using the default `sha512` digest)
 ///
 /// Compatible with ed25519-donna [ed25519_publickey](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L45)
 #[no_mangle]
@@ -67,7 +73,7 @@ fn ed25519_publickey<D: Digest<OutputSize = U64>>(sk: *mut SecretKey, pk: *mut P
     pk.copy_from_slice(public_key.as_bytes());
 }
 
-/// Verifies a signed message using standard (Sha512) digest
+/// Verifies a signed message (using the default `sha512` digest)
 ///
 /// Compatible with ed25519-donna [ed25519_sign_open](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L94)
 #[no_mangle]
@@ -159,7 +165,7 @@ fn ed25519_sign<D: Digest<OutputSize = U64>>(
     sig.copy_from_slice(signature.as_ref());
 }
 
-/// Signs a message using the provided secret key (using the default Sha512 digest)
+/// Signs a message using the provided secret key (using the default `sha512` digest)
 ///
 /// Compatible with ed25519-donna [ed25519_sign](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L59)
 #[no_mangle]
@@ -173,7 +179,8 @@ pub extern "C" fn dalek_ed25519_sign(
     ed25519_sign::<Sha512>(m, mlen, sk, pk, sig);
 }
 
-/// Batch verify signatures, valid[i] == 1 for valid, 0 otherwise
+/// Batch verify signatures, `valid[i] == 1` for valid, `valid[i] == 0` otherwise INCOMPLETE
+/// 
 // TODO(@ryankurte): `ed25519-donna-batchverify.h` has -a lot- going on, presumably for performance reasons (see `cargo bench`)...
 // seems like [`ed25519_dalek::verify_batch`] could substitute but we still need to return the *valid values per message (and run without `std` or `alloc`)
 // TODO(@ryankurte): reverse engineer the error returns from the existing code
@@ -289,7 +296,7 @@ pub extern "C" fn dalek_curve25519_scalarmult(
     o.copy_from_slice(&p);
 }
 
-/// Generate a public key using the expanded (sk + sk_ext) form of the secret key
+/// Generate a public key using the expanded (`sk + sk_ext`) form of the secret key
 #[no_mangle]
 pub extern "C" fn dalek_ed25519_publickey_ext(
     sk: *mut SecretKey,
@@ -314,7 +321,7 @@ pub extern "C" fn dalek_ed25519_publickey_ext(
     pk.copy_from_slice(public.as_ref());
 }
 
-/// Generate a signature using the expanded (sk + sk_ext) form of the secret key.
+/// Generate a signature using the expanded (`sk + sk_ext`) form of the secret key.
 #[no_mangle]
 pub extern "C" fn dalek_ed25519_sign_ext(
     m: *const u8,

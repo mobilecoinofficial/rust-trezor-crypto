@@ -1,3 +1,5 @@
+//! ed25519 API using `keccak512` signatures, equivalent to `ed25519-donna` APIs generated with a custom `keccak512` hasher (see [`tests/ed25519-keccak.c`](https://github.com/ryankurte/rust-trezor-crypto/blob/main/tests/ed25519-keccak.c))
+
 use super::{PublicKey, SecretKey, Signature};
 use crate::{Int, UInt};
 

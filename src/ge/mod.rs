@@ -1,6 +1,5 @@
+//! Generic edwards curve operations, ABI compatible with [`ed25519-donna-impl-base.h`](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519-donna-impl-base.h)
 //!
-//!
-//! Via ed25519-donna-impl-base.(c|h)
 //!
 
 use core::slice;
@@ -18,6 +17,9 @@ use sha3::{Keccak512};
 
 use crate::modm::{Bignum25519, Bignum256Modm};
 
+/// Edwards point object compatible with `ge25519_t` from [ed25519-donna.h:81](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519-donna.h#L81)
+/// 
+/// TODO: test against bindgen version to ensure struct alignment?
 #[derive(Clone, PartialEq, Debug)]
 #[repr(C)]
 pub struct Ge25519 {
@@ -62,6 +64,7 @@ impl Ge25519 {
     }
 }
 
+/// TODO
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_set_neutral(r: *mut Ge25519) {
     // TODO(@ryankurte): is this a _complete_ definition?
@@ -69,11 +72,7 @@ pub unsafe extern "C" fn ge25519_set_neutral(r: *mut Ge25519) {
     (*r).z[0] = 1;
 }
 
-//ge25519_pniels P_ni = {0};
-//ge25519_p1p1 P_11 = {0};
-//ge25519_full_to_pniels(&P_ni, q);
-//ge25519_pnielsadd_p1p1(&P_11, p, &P_ni, signbit);
-//ge25519_p1p1_to_full(r, &P_11);
+/// Point addition, `r = a + b`
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_add(
     r: *mut Ge25519,
@@ -100,9 +99,7 @@ pub unsafe extern "C" fn ge25519_add(
     (*r).update(&r1)
 }
 
-//	ge25519_p1p1 t = {0};
-//	ge25519_double_p1p1(&t, p);
-//	ge25519_p1p1_to_full(r, &t);
+/// Point doubling, `r = 2 * p`
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_double(r: *mut Ge25519, p: *const Ge25519) {
     let p1 = match EdwardsPoint::try_from(&*p) {
@@ -117,10 +114,7 @@ pub unsafe extern "C" fn ge25519_double(r: *mut Ge25519, p: *const Ge25519) {
     *r = Ge25519::from(&r1);
 }
 
-/// r = [8]P
-//ge25519_double_partial(r, t);
-//ge25519_double_partial(r, r);
-//ge25519_double(r, r);
+/// Multiply by cofactor, `r = [8]P`
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_mul8(r: *mut Ge25519, p: *const Ge25519) {
     let p1 = match EdwardsPoint::try_from(&*p) {
@@ -133,7 +127,7 @@ pub unsafe extern "C" fn ge25519_mul8(r: *mut Ge25519, p: *const Ge25519) {
     *r = Ge25519::from(&r1);
 }
 
-/// r = [s1]p1 + [s2]base
+/// Point/Scalar multiplication, `r = [s1]p1 + [s2]base`
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_double_scalarmult_vartime(
     r: *mut Ge25519,
@@ -156,7 +150,7 @@ pub unsafe extern "C" fn ge25519_double_scalarmult_vartime(
     *r = Ge25519::from(&r1);
 }
 
-/// r = [s1]p1 + [s2]p2
+/// Point/Scalar multiplication, `r = [s1]p1 + [s2]p2`
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_double_scalarmult_vartime2(
     r: *mut Ge25519,
@@ -184,7 +178,7 @@ pub unsafe extern "C" fn ge25519_double_scalarmult_vartime2(
     *r = Ge25519::from(&r1);
 }
 
-/// Convert to compressed curve form
+/// Convert point `p1` ([`Ge25519`]) to compressed form `r` (`[u8; 32]`)
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_pack(r: *mut [u8; 32], p1: *const Ge25519) {
     let p1 = match EdwardsPoint::try_from(&*p1) {
@@ -197,7 +191,7 @@ pub unsafe extern "C" fn ge25519_pack(r: *mut [u8; 32], p1: *const Ge25519) {
     (*r).copy_from_slice(c1.as_bytes());
 }
 
-/// Unpack from compressed curve form
+/// Unpack compressed curve form `c` (`[u8; 32]`) to `r` ([`Ge25519`])
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_unpack_vartime(r: *mut Ge25519, c: *const [u8; 32]) -> c_int {
     let c1 = CompressedEdwardsY(*c);
@@ -212,7 +206,7 @@ pub unsafe extern "C" fn ge25519_unpack_vartime(r: *mut Ge25519, c: *const [u8; 
     return 1;
 }
 
-/// Copy from p to r
+///Point copy, `r = p`
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_copy(r: *mut Ge25519, p: *const Ge25519) {
     (*r).x = (*p).x;
@@ -221,23 +215,10 @@ pub unsafe extern "C" fn ge25519_copy(r: *mut Ge25519, p: *const Ge25519) {
     (*r).t = (*p).t;
 }
 
-// Point from sha3 keccak hash (field element?) in variable time
-// TODO: is this what the xmr folks are -trying- to do..?
-#[no_mangle]
-pub unsafe extern "C" fn ge25519_from_hash_sha3k_vartime(
-    r: *mut Ge25519,
-    data: *mut u8,
-    len: usize,
-) {
-    let buff = slice::from_raw_parts(data, len);
-
-    let p = EdwardsPoint::hash_from_bytes::<Keccak512>(buff);
-
-    *r = Ge25519::from(&p);
-}
-// Point from [hash] (field element?) in variable time
-// TODO(@ryankurte): what is this -actually- doing / is this duplicating some common cryptographic operation?
-//#[cfg(nope)]
+/// Point from hash (`[u8; 32]`) in variable time (monero impl) INCOMPLETE
+/// 
+/// Elligator2 based point derivation for Monero
+// TODO: incomplete / broken
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
     r: *mut Ge25519,
@@ -247,7 +228,7 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
     // Zmod(2^255-19) from byte array to bignum25519 ([u32; 10]) expansion with modular reduction
     let mut u = FieldElement2625::from_bytes(&*p);
 
-    // TODO: Check input is canonical
+    // TODO: Check input is canonical / expand & reduce?
     // curve25519_expand_reduce(u, s);
     //let mut u = expand_reduce(&*p);
 
@@ -393,7 +374,7 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
 }
 
 
-// r = [s1]p1, constant time
+/// Point scalar multiplication, `r = [s1]p1`, constant time
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_scalarmult(
     r: *mut Ge25519,
@@ -412,10 +393,7 @@ pub unsafe extern "C" fn ge25519_scalarmult(
     *r = Ge25519::from(&r1);
 }
 
-/// computes [s] niels_basepoint
-///
-/// (wraps [`ge25519_scalarmult_base_niels`] while passing basepoint table)
-// 	ge25519_scalarmult_base_niels(r, ge25519_niels_base_multiples, s);
+/// Compute point from scalar via niels_basepoint, `r = s * B`
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_scalarmult_base_wrapper(r: *mut Ge25519, s: *const Bignum256Modm) {
     let s1 = Scalar::from_unpacked_u32(*s);
@@ -425,7 +403,8 @@ pub unsafe extern "C" fn ge25519_scalarmult_base_wrapper(r: *mut Ge25519, s: *co
     *r = Ge25519::from(&r1);
 }
 
-/// Check if R is on a curve
+/// Check if point `p1` is on a curve
+// TODO: better description..?
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_check(p1: *const Ge25519) -> c_int {
     let p1 = match EdwardsPoint::try_from(&*p1) {
@@ -443,7 +422,7 @@ pub unsafe extern "C" fn ge25519_check(p1: *const Ge25519) -> c_int {
     }
 }
 
-/// Check if `a` == `b`
+/// Point comparison, returns 1 if points are equal, 0 otherwise
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_eq(a: *const Ge25519, b: *const Ge25519) -> c_int {
     let (p1, p2) = match (EdwardsPoint::try_from(&*a), EdwardsPoint::try_from(&*b)) {
@@ -458,6 +437,9 @@ pub unsafe extern "C" fn ge25519_eq(a: *const Ge25519, b: *const Ge25519) -> c_i
 }
 
 /// Timing safe memory compare
+/// 
+/// See [ed25519-donna.h:L67](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519-donna.h#L67)
+/// TODO: why is this called `_verify` instead of something wild like, `_compare`..?
 #[no_mangle]
 pub unsafe extern "C" fn ed25519_verify(
     x: *const c_uchar,
@@ -480,6 +462,7 @@ pub unsafe extern "C" fn ed25519_verify(
         _ => 0,
     }
 }
+
 
 // TODO: expand reduce helper, not sure what this is -meant- to be doing yet...
 fn expand_reduce(r: &[u8; 32]) -> FieldElement2625 {

@@ -1,3 +1,5 @@
+//! ed25519 API using `sha3` signatures, equivalent to `ed25519-donna` APIs generated with a custom `sha3` hasher (see [`tests/ed25519-sha3.c`](https://github.com/ryankurte/rust-trezor-crypto/blob/main/tests/ed25519-sha3.c))
+
 use super::{ed25519_sign, PublicKey, SecretKey, Signature};
 use crate::{Int, UInt};
 
