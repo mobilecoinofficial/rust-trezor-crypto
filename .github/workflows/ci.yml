@@ -26,7 +26,7 @@ jobs:
             use_cross: true
             test: false
             # TODO: sort out build_donna feature / tests for thumbv7em
-            args: --no-default-features --features=u32_backend,getrandom/custom
+            args: --no-default-features --features=getrandom/custom
 
     steps:
     - uses: actions/checkout@v2
@@ -82,12 +82,13 @@ jobs:
       - name: Clone repository
         uses: actions/checkout@v2
         with:
-          submodules: true
+          submodules: recursive
 
       - name: Fetch rust tooling
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
+          override: true
 
       - name: Configure caching
         uses: actions/cache@v2
