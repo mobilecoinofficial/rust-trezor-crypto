@@ -245,7 +245,7 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
 ) {
 
     // Zmod(2^255-19) from byte array to bignum25519 ([u32; 10]) expansion with modular reduction
-    let u = FieldElement2625::from_bytes(&*p);
+    let mut u = FieldElement2625::from_bytes(&*p);
 
     // TODO: Check input is canonical
     // curve25519_expand_reduce(u, s);
@@ -254,7 +254,7 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
     // TODO: non-canonical inputs give invalid results..? 
     if *p != u.to_bytes() {
         println!("Non-canonical input");
-        //u = FieldElement2625::from_bytes(&u.to_bytes());
+        u = FieldElement2625::from_bytes(&u.to_bytes());
         //return;
     }
 
@@ -484,9 +484,12 @@ pub unsafe extern "C" fn ed25519_verify(
 // TODO: expand reduce helper, not sure what this is -meant- to be doing yet...
 fn expand_reduce(r: &[u8; 32]) -> FieldElement2625 {
 
-    let f1 = FieldElement2625::from_bytes(r);
+    let mut f = FieldElement2625::from_bytes(r);
 
-    FieldElement2625::from_bytes(&f1.to_bytes())
+
+    let mut ec = f.to_bytes();
+
+    FieldElement2625::from_bytes(&ec)
 }
 
 
