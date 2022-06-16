@@ -11,7 +11,8 @@ use curve25519_dalek::{
     constants::{ED25519_BASEPOINT_TABLE, MONTGOMERY_A, SQRT_M1, MONTGOMERY_A_NEG, MINUS_ONE},
     edwards::{CompressedEdwardsY, EdwardsPoint},
     scalar::Scalar,
-    internals::FieldElement2625,
+    field::FieldElement,
+    traits::Identity,
 };
 use sha3::{Keccak512};
 
@@ -67,9 +68,7 @@ impl Ge25519 {
 /// TODO
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_set_neutral(r: *mut Ge25519) {
-    // TODO(@ryankurte): is this a _complete_ definition?
-    (*r).y[0] = 1;
-    (*r).z[0] = 1;
+    (*r) = Ge25519::from(&EdwardsPoint::identity());
 }
 
 /// Point addition, `r = a + b`
@@ -107,9 +106,7 @@ pub unsafe extern "C" fn ge25519_double(r: *mut Ge25519, p: *const Ge25519) {
         Err(_) => return,
     };
 
-    // TODO(@ryankurte): is doubling an edwards point equivalent to scalar multiplication..?
-    // why is `.double()` internal only?
-    let r1 = Scalar::from(2u8) * &p1;
+    let r1 = &p1 + &p1;
 
     *r = Ge25519::from(&r1);
 }
@@ -226,21 +223,19 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
 ) {
 
     // Zmod(2^255-19) from byte array to bignum25519 ([u32; 10]) expansion with modular reduction
-    let mut u = FieldElement2625::from_bytes(&*p);
-
-    // TODO: Check input is canonical / expand & reduce?
-    // curve25519_expand_reduce(u, s);
-    //let mut u = expand_reduce(&*p);
+    // (and ensure input is canonical)
+    //let mut u = FieldElement::from_bytes(&*p);
+    let mut u = expand_reduce(&*p);
 
     // TODO: non-canonical inputs give invalid results..? 
     if *p != u.to_bytes() {
+        #[cfg(test)]
         println!("Non-canonical input");
-        u = FieldElement2625::from_bytes(&u.to_bytes());
         //return;
     }
 
     // w = (2 * u * u + 1) % q
-    let w = &u.square2() + &FieldElement2625::one();
+    let w = &u.square2() + &FieldElement::one();
 
     // xp = (w *  w - 2 * A * A * u * u) % q
     let xp = &w.square() - &(&MONTGOMERY_A.square2() * &u.square());
@@ -255,40 +250,43 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
     // y = (2 * u * u  + 1 - x) % q #w - x, if y is zero, then x = w
     let mut y = &w - &x;
 
-    let mut z = FieldElement2625::zero();
+    let mut z = FieldElement::zero();
 
+    // Setup constants
+    let two = &FieldElement::one() + &FieldElement::one();
+    let minus_two = { 
+        let mut t = two.clone();
+        t.negate();
+        t
+    };
 
-    let two = &FieldElement2625::one() + &FieldElement2625::one();
-    let minus_two = &FieldElement2625::zero() - &two;
-
-
-    let fffb1 = &MINUS_ONE * &FieldElement2625::sqrt_ratio_i(
+    let fffb1 = &MINUS_ONE * &FieldElement::sqrt_ratio_i(
         &(&(&minus_two * &MONTGOMERY_A) * &(&MONTGOMERY_A + &two)),
-        &FieldElement2625::one(),
+        &FieldElement::one(),
     ).1;
 
-    let fffb2 = &MINUS_ONE * &FieldElement2625::sqrt_ratio_i(
+    let fffb2 = &MINUS_ONE * &FieldElement::sqrt_ratio_i(
         &(&(&two * &MONTGOMERY_A) * &(&MONTGOMERY_A + &two)),
-        &FieldElement2625::one(),
+        &FieldElement::one(),
     ).1;
 
-    let fffb3 = &FieldElement2625::sqrt_ratio_i(
+    let fffb3 = &FieldElement::sqrt_ratio_i(
         &(&(&MINUS_ONE * &(&SQRT_M1 * &MONTGOMERY_A)) * &(&MONTGOMERY_A + &two)),
-        &FieldElement2625::one(),
+        &FieldElement::one(),
     ).1;
 
-    let fffb4 = &MINUS_ONE * &FieldElement2625::sqrt_ratio_i(
+    let fffb4 = &MINUS_ONE * &FieldElement::sqrt_ratio_i(
         &(&(&SQRT_M1 * &MONTGOMERY_A) * &(&MONTGOMERY_A + &two)),
-        &FieldElement2625::one(),
+        &FieldElement::one(),
     ).1;
 
 
     let mut negative = false;
 
-    if y != FieldElement2625::zero() {
+    if y != FieldElement::zero() {
         // Check if we have negative square root
         y = &w + &x;
-        if y != FieldElement2625::zero() {
+        if y != FieldElement::zero() {
             negative = true;
 
         } else {
@@ -298,6 +296,7 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
             negative = false;
         }
 
+        #[cfg(test)]
         println!("Non zero!");
         
     } else {
@@ -305,6 +304,7 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
         // rx = (rx * -1 * ed25519.sqroot(2 * A * (A + 2) ) ) % q 
         rx = &rx * &fffb2;
 
+        #[cfg(test)]
         println!("Zero~!");
     }
 
@@ -318,6 +318,7 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
 
         sign = 0;
 
+        #[cfg(test)]
         println!("Not negative!");
 
     } else {
@@ -328,7 +329,7 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
         // y = (w - x) % q 
         y = &w - &x;
 
-        if y != FieldElement2625::zero() {
+        if y != FieldElement::zero() {
             // rx = rx * ed25519.sqroot( -1 * sqrtm1 * A * (A + 2)) % q
             rx = &rx * &fffb3;
         } else {
@@ -338,6 +339,7 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
             
         sign = 1;
 
+        #[cfg(test)]
         println!("Negative!");
     }
     
@@ -347,6 +349,7 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
         // rx =  - (rx) % q 
         rx.negate();
 
+        #[cfg(test)]
         println!("Negated!");
     }
 
@@ -357,13 +360,12 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
     // rx = rx * rz % q
     let rx = &rx * &rz;
 
-    let rt = &rx * &ry;
+    let rt = FieldElement::one();
 
     let p = EdwardsPoint::try_from_raw_u32(
         *rx.as_ref(),
         *ry.as_ref(),
         *rz.as_ref(),
-        // TODO: i -think- this torsion part is incorrect?
         *rt.as_ref(),
     ).unwrap();
 
@@ -412,9 +414,8 @@ pub unsafe extern "C" fn ge25519_check(p1: *const Ge25519) -> c_int {
         Err(_) => return 0,
     };
 
-    // For a valid point compress and decompress should result
-    // in the same point
-    // TODO(@ryankurte): is there a better way to do this?
+    // For a valid point compress and decompress should result in the same point
+    // TODO: i think we're conflating a point's _validity_ on the curve (see dalek's ValidityCheck) vs. whether a point is in reduced (ie. modulo'd) form..?
     let c = p1.compress();
     match c.decompress() {
         Some(p2) if &p1 == &p2 => 1,
@@ -465,14 +466,13 @@ pub unsafe extern "C" fn ed25519_verify(
 
 
 // TODO: expand reduce helper, not sure what this is -meant- to be doing yet...
-fn expand_reduce(r: &[u8; 32]) -> FieldElement2625 {
+fn expand_reduce(r: &[u8; 32]) -> FieldElement {
 
-    let mut f = FieldElement2625::from_bytes(r);
-
+    let mut f = FieldElement::from_bytes(r);
 
     let mut ec = f.to_bytes();
 
-    FieldElement2625::from_bytes(&ec)
+    FieldElement::from_bytes(&ec)
 }
 
 

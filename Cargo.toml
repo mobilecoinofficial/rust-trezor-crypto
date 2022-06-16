@@ -31,12 +31,12 @@ subtle = { version = "2.4.1", default_features = false }
 
 [dependencies.curve25519-dalek]
 version = "3.2.1"
-features = [ "u32_backend", "unstable_internals" ]
+features = [ "u32_backend", "yolo_crypto" ]
 default_features = false
 
 [dependencies.ed25519-dalek]
 version = "1.0.1"
-features = [ "u32_backend" ]
+features = [ "u32_backend", "yolo_crypto" ]
 default_features = false
 
 [dependencies.x25519-dalek]
