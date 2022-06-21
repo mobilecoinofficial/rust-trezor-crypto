@@ -179,6 +179,8 @@ pub extern "C" fn dalek_ed25519_sign(
     ed25519_sign::<Sha512>(m, mlen, sk, pk, sig);
 }
 
+const MAX_BATCH_SIZE: usize = 16;
+
 /// Batch verify signatures, `valid[i] == 1` for valid, `valid[i] == 0` otherwise INCOMPLETE
 /// 
 // TODO(@ryankurte): `ed25519-donna-batchverify.h` has -a lot- going on, presumably for performance reasons (see `cargo bench`)...
@@ -193,6 +195,8 @@ pub extern "C" fn dalek_ed25519_sign_open_batch(
     num: UInt,
     valid: *mut Int,
 ) -> Int {
+    use core::slice::{from_raw_parts};
+
     // Convert pointers into slices
     let (m, mlen, pk, rs, valid) = unsafe {
         (

@@ -3,16 +3,16 @@
 //!
 
 use core::slice;
-use std::f32::MIN;
 
+use byteorder::{ByteOrder, LittleEndian};
 use cty::{c_int, c_uchar, size_t};
 
 use curve25519_dalek::{
-    constants::{ED25519_BASEPOINT_TABLE, MONTGOMERY_A, SQRT_M1, MONTGOMERY_A_NEG, MINUS_ONE},
+    constants::{ED25519_BASEPOINT_TABLE, MONTGOMERY_A, MONTGOMERY_A_NEG, SQRT_M1, MINUS_ONE},
     edwards::{CompressedEdwardsY, EdwardsPoint},
     scalar::Scalar,
     field::FieldElement,
-    traits::Identity,
+    traits::Identity, montgomery::MontgomeryPoint,
 };
 use sha3::{Keccak512};
 
@@ -212,9 +212,139 @@ pub unsafe extern "C" fn ge25519_copy(r: *mut Ge25519, p: *const Ge25519) {
     (*r).t = (*p).t;
 }
 
+fn load3(d: &[u8]) -> i64 {
+    let r = (d[0] as u64) | (d[1] as u64) << 8 | (d[2] as u64) << 16;
+    r as i64
+}
+
+fn load4(d: &[u8]) -> i64 {
+    let r = (d[0] as u64) | (d[1] as u64) << 8 | (d[2] as u64) << 16 | (d[3] as u64) << 24;
+
+    r as i64
+}
+
+const reduce_mask_25: u32 = (1 << 25) - 1;
+const reduce_mask_26: u32 = (1 << 26) - 1;
+
+/// Re-implementation of curve25519_expand_reduce from trezor's donna port
+unsafe fn dalek_curve25519_expand_reduce(hash: &[u8; 32]) -> FieldElement {
+    let mut x = [0u32; 8];
+
+    // Load in words
+    for i in 0..x.len() {
+        x[i] = LittleEndian::read_u32(&hash[i*4..]);
+    }
+
+    // Perform expansion / reduction
+    let mut out = [0u32; 10];
+
+    out[0] = (                       x[0] as u64       ) as u32 & reduce_mask_26;
+	out[1] = ((((x[1] as u64) << 32) | x[0] as u64) >> 26) as u32 & reduce_mask_25;
+	out[2] = ((((x[2] as u64) << 32) | x[1] as u64) >> 19) as u32 & reduce_mask_26;
+	out[3] = ((((x[3] as u64) << 32) | x[2] as u64) >> 13) as u32 & reduce_mask_25;
+	out[4] = ((                      x[3] as u64) >>  6) as u32 & reduce_mask_26;
+	out[5] = (                       x[4] as u64       ) as u32 & reduce_mask_25;
+	out[6] = ((((x[5] as u64) << 32) | x[4] as u64) >> 25) as u32 & reduce_mask_26;
+	out[7] = ((((x[6] as u64) << 32) | x[5] as u64) >> 19) as u32 & reduce_mask_25;
+	out[8] = ((((x[7] as u64) << 32) | x[6] as u64) >> 12) as u32 & reduce_mask_26;
+	out[9] = ((                      x[7] as u64) >>  6) as u32; // & reduce_mask_25; /* ignore the top bit */
+	out[0] += 19 * (out[9] >> 25);
+	out[9] &= reduce_mask_25;
+
+    FieldElement::from_raw_u32(out)
+}
+
+/// Port of monero's field loading from crypto-ops.c
+fn monero_fromfe(p: *const [u8; 32]) -> FieldElement {
+    let p = unsafe { &*p };
+
+    let mut h0 = load4(&p[..]);
+    let mut h1 = load3(&p[4..]) << 6;
+    let mut h2 = load3(&p[7..]) << 5;
+    let mut h3 = load3(&p[10..]) << 3;
+    let mut h4 = load3(&p[13..]) << 2;
+    let mut h5 = load4(&p[16..]);
+    let mut h6 = load3(&p[20..]) << 7;
+    let mut h7 = load3(&p[23..]) << 5;
+    let mut h8 = load3(&p[26..]) << 4;
+    let mut h9 = load3(&p[29..]) << 2;
+
+    let carry9 = (h9 + (1<<24)) >> 25;
+    h0 += carry9 * 19;
+    h9 -= carry9 << 25;
+
+    let carry1 = (h1 + (1<<24)) >> 25;
+    h2 += carry1;
+    h1 -= carry1 << 25;
+
+    let carry3 = (h3 + (1<<24)) >> 25;
+    h4 += carry3;
+    h3 -= carry3 << 25;
+
+
+    let carry5 = (h5 + (1<<24)) >> 25;
+    h6 += carry5;
+    h5 -= carry5 << 25;
+
+    let carry7 = (h7 + (1<<24)) >> 25;
+    h8 += carry7;
+    h7 -= carry7 << 25;
+
+    let carry0 = (h0 + (1<<25)) >> 26;
+    h1 += carry0;
+    h0 -= carry0 << 26;
+
+    let carry2 = (h2 + (1<<25)) >> 26;
+    h3 += carry2;
+    h2 -= carry2 << 26;
+
+    let carry4 = (h4 + (1<<25)) >> 26;
+    h5 += carry4;
+    h4 -= carry4 << 26;
+
+    let carry6 = (h6 + (1<<25)) >> 26;
+    h7 += carry6;
+    h6 -= carry6 << 26;
+
+    let carry8 = (h8 + (1<<25)) >> 26;
+    h9 += carry8;
+    h8 -= carry8 << 26;
+
+    return unsafe { FieldElement::from_raw_u32([
+        h0 as u32, h1 as u32, h2 as u32, h3 as u32, h4 as u32, 
+        h5 as u32, h6 as u32, h7 as u32, h8 as u32, h9 as u32,
+    ]) };
+}
+
+/* A = 2 * (1 - d) / (1 + d) = 486662 */
+
+///  -A^2
+const FE_MA2: FieldElement = FieldElement::from_raw_u32([
+    0x33de3c9, 0x1fff236, 0x3ffffff, 0x1ffffff, 0x3ffffff, 0x1ffffff, 0x3ffffff, 0x1ffffff, 0x3ffffff, 0x1ffffff]);
+
+/// -A
+const FE_MA: FieldElement = FieldElement::from_raw_u32([
+    0x3f892e7, 0x1ffffff, 0x3ffffff, 0x1ffffff, 0x3ffffff, 0x1ffffff, 0x3ffffff, 0x1ffffff, 0x3ffffff, 0x1ffffff]); 
+    
+/// sqrt(-2 * A * (A + 2))
+const FE_FFFB1: FieldElement = FieldElement::from_raw_u32([
+    0x1e3bdff, 0x025a2b3, 0x18e5bab, 0x0ba36ac, 0x0b9afed, 0x004e61c, 0x31d645f, 0x09d1bea, 0x102529e, 0x0063810]); 
+
+// sqrt(2 * A * (A + 2))
+const FE_FFFB2: FieldElement = FieldElement::from_raw_u32([
+    0x383650d, 0x066df27, 0x10405a4, 0x1cfdd48, 0x2b887f2, 0x1e9a041, 0x1d7241f, 0x0612dc5, 0x35fba5d, 0x0cbe787]);
+
+/// sqrt(-sqrt(-1) * A * (A + 2))
+const FE_FFFB3: FieldElement = FieldElement::from_raw_u32([
+    0x0cfd387, 0x1209e3a, 0x3bad4fc, 0x18ad34d, 0x2ff6c02, 0x0f25d12, 0x15cdfe0, 0x0e208ed, 0x32eb3df, 0x062d7bb]); 
+
+/// sqrt(sqrt(-1) * A * (A + 2))
+const FE_FFFB4: FieldElement = FieldElement::from_raw_u32([
+    0x2b39186, 0x14640ed, 0x14930a7, 0x04509fa, 0x3b91bf0, 0x0f7432e, 0x07a443f, 0x17f24d8, 0x031067d, 0x0690fcc]);
+
+
 /// Point from hash (`[u8; 32]`) in variable time (monero impl) INCOMPLETE
-/// 
-/// Elligator2 based point derivation for Monero
+///
 // TODO: incomplete / broken
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
@@ -223,26 +353,76 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
 ) {
 
     // Zmod(2^255-19) from byte array to bignum25519 ([u32; 10]) expansion with modular reduction
-    // (and ensure input is canonical)
-    //let mut u = FieldElement::from_bytes(&*p);
-    let mut u = expand_reduce(&*p);
 
-    // TODO: non-canonical inputs give invalid results..? 
+    // Now with three incompatible `from_bytes` methods!
+    
+    // Dalek impl masks lower bits causing failures later on
+    // (tested with manual impl of [`FieldElement::from_bytes`] without the mask, which matches [`dalek_curve25519_expand_reduce`])
+    let u1 = FieldElement::from_bytes(&*p);
+
+    // Donna impl seems to do the expect, without lower bit masking
+    let u2 = dalek_curve25519_expand_reduce(&*p);
+
+    // Monero impl appears to skip masking lower bits and normalisation
+    // Matches monero C code but overflows if one tries to -do- anything with dalek
+    let u3 = monero_fromfe(p);
+
+    #[cfg(test)]
+    println!("dalek:  {:?}\r\ndonna:  {:?}\r\nmonero: {:?}", u1, u2, u3);
+
+    let mut u = u2;
+
     if *p != u.to_bytes() {
-        #[cfg(test)]
-        println!("Non-canonical input");
-        //return;
+        // TODO: canonicalisation doesn't -seem- to change anything
+        u = FieldElement::from_bytes(&u.to_bytes());
     }
 
-    // w = (2 * u * u + 1) % q
+    // Now we have -two- non-functional implementations!
+    // that generate differing X terms! but pass the same tests...
+    let p1 = ge25519_fromfe_frombytes_vartime_trezor(&u);
+    let p2 = ge25519_fromfe_frombytes_vartime_monero(&u);
+
+    // TODO: For failing tests we don't _seem_ to be generating valid points!?
+    let p1_valid = match check_valid(&p1) {
+        true => "VALID",
+        false => "INVALID",
+    };
+    let p2_valid = match check_valid(&p2) {
+        true => "VALID",
+        false => "INVALID",
+    };
+
+
+    #[cfg(test)]
+    println!("points:\r\n\tdonna:  {:?} ({})\r\n\tmonero: {:?} ({})\r\n", 
+        p1, p1_valid, p2, p2_valid);
+
+    //assert_eq!(p1, p2);
+    
+    *r = Ge25519::from(&p2);
+}
+
+fn check_valid(p: &EdwardsPoint) -> bool {
+    p.compress().decompress().is_some()
+}
+
+// Re-implementation from monero source
+unsafe fn ge25519_fromfe_frombytes_vartime_monero(u: &FieldElement) -> EdwardsPoint {
+    // w = (2 * u^2 + 1) % q
     let w = &u.square2() + &FieldElement::one();
 
-    // xp = (w *  w - 2 * A * A * u * u) % q
+    // xp = (w^2 - 2 * A^2 * u^2) % q
     let xp = &w.square() - &(&MONTGOMERY_A.square2() * &u.square());
 
     // rx = ed25519.expmod(w * ed25519.inv(xp),(q+3)/8,q) 
-    let mut rx = (&w * &xp.invert()).pow_p58();
+    let rx1 = (&w * &xp.invert()).pow_p58();  // rx = (w / x)^(m + 1)
 
+    // Re-implemented from monero crypto-ops.c
+    let rx2 = fe_divpowm1(&w, &xp);
+
+    let mut rx = rx2;
+
+    let y = rx.square();
 
     // x = rx * rx * (w * w - 2 * A * A * u * u) % q
     let mut x = &rx.square() * &xp;
@@ -251,34 +431,6 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
     let mut y = &w - &x;
 
     let mut z = FieldElement::zero();
-
-    // Setup constants
-    let two = &FieldElement::one() + &FieldElement::one();
-    let minus_two = { 
-        let mut t = two.clone();
-        t.negate();
-        t
-    };
-
-    let fffb1 = &MINUS_ONE * &FieldElement::sqrt_ratio_i(
-        &(&(&minus_two * &MONTGOMERY_A) * &(&MONTGOMERY_A + &two)),
-        &FieldElement::one(),
-    ).1;
-
-    let fffb2 = &MINUS_ONE * &FieldElement::sqrt_ratio_i(
-        &(&(&two * &MONTGOMERY_A) * &(&MONTGOMERY_A + &two)),
-        &FieldElement::one(),
-    ).1;
-
-    let fffb3 = &FieldElement::sqrt_ratio_i(
-        &(&(&MINUS_ONE * &(&SQRT_M1 * &MONTGOMERY_A)) * &(&MONTGOMERY_A + &two)),
-        &FieldElement::one(),
-    ).1;
-
-    let fffb4 = &MINUS_ONE * &FieldElement::sqrt_ratio_i(
-        &(&(&SQRT_M1 * &MONTGOMERY_A) * &(&MONTGOMERY_A + &two)),
-        &FieldElement::one(),
-    ).1;
 
 
     let mut negative = false;
@@ -291,21 +443,15 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
 
         } else {
             // rx = rx * -1 * ed25519.sqroot(-2 * A * (A + 2) ) % q
-            rx = &rx * &fffb1;
+            rx = &rx * &FE_FFFB1;
 
             negative = false;
         }
 
-        #[cfg(test)]
-        println!("Non zero!");
-        
     } else {
         // y was 0
         // rx = (rx * -1 * ed25519.sqroot(2 * A * (A + 2) ) ) % q 
-        rx = &rx * &fffb2;
-
-        #[cfg(test)]
-        println!("Zero~!");
+        rx = &rx * &FE_FFFB2;
     }
 
     let mut sign = 0;
@@ -318,39 +464,29 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
 
         sign = 0;
 
-        #[cfg(test)]
-        println!("Not negative!");
-
     } else {
-        // z = -1 * A
-        z = MONTGOMERY_A_NEG;
-        // x = x * sqrtm1 % q 
-        x = &x * &SQRT_M1;
-        // y = (w - x) % q 
-        y = &w - &x;
+        
+        z = MONTGOMERY_A_NEG;                   // z = -1 * A
+        x = &x * &SQRT_M1;                      // x = x * sqrtm1 % q 
+        y = &w - &x;                            // y = (w - x) % q 
 
         if y != FieldElement::zero() {
             // rx = rx * ed25519.sqroot( -1 * sqrtm1 * A * (A + 2)) % q
-            rx = &rx * &fffb3;
+            rx = &(&rx * &MINUS_ONE) * &FE_FFFB3;
         } else {
             // rx = rx * -1 * ed25519.sqroot( sqrtm1 * A * (A + 2)) % q
-            rx = &rx * &fffb4;
+            rx = &(&rx * &MINUS_ONE) * &FE_FFFB4;
         }
             
         sign = 1;
 
-        #[cfg(test)]
-        println!("Negative!");
     }
-    
+
     // if ( (rx % 2) != sign ):
     // TODO: is this direction correct?
     if rx.is_negative().unwrap_u8() != sign {
         // rx =  - (rx) % q 
         rx.negate();
-
-        #[cfg(test)]
-        println!("Negated!");
     }
 
     // rz = (z + w) % q
@@ -369,12 +505,155 @@ pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
         *rt.as_ref(),
     ).unwrap();
 
-    // TODO: compress, work out whether mul8 is included in test vectors?
-    //let p = p.mul_by_cofactor();
-    
-    *r = Ge25519::from(&p);
+    p
 }
 
+/// `fe_divpowm1` from monero's crypto-ops.c
+fn fe_divpowm1(u: &FieldElement, v: &FieldElement) -> FieldElement {
+
+    let v3 = &v.square() * &v;
+    let uv7 = &(&v3.square() * &v) * u;      // uv7 = u * v^7
+
+    // fe_pow22523(uv7, uv7);
+
+    let t0 = uv7.square();              // fe_sq(t0, uv7);
+    let t1 = t0.square().square();      // fe_sq(t1, t0); fe_sq(t1, t1);
+    let t1 = &uv7 * &t1;                // fe_mul(t1, uv7, t1);
+    let t0 = &t0 * &t1;                 // fe_mul(t0, t0, t1);
+    let t0 = t0.square();               // fe_sq(t0, t0);
+    let t0 = &t1 * &t0;                 // fe_mul(t0, t1, t0);
+    let mut t1 = t0.square();           // fe_sq(t1, t0);
+    for i in 0..4 {
+        t1 = t1.square();               // fe_sq(t1, t1);
+    }
+    let t0 = &t1 * &t0;                 // fe_mul(t0, t1, t0);
+    let mut t1 = t0.square();           // fe_sq(t1, t0);
+    for i in 0..9 {
+        t1 = t1.square();               // fe_sq(t1, t1);
+    }
+    let t1 = &t1 * &t0;                 // fe_mul(t1, t1, t0);
+    let mut t2 = t1.square();           // fe_sq(t2, t1);
+    for i in 0..19 {
+        t2 = t2.square();               // fe_sq(t2, t2);
+    }
+    let mut t1 = &t2 * &t1;             // fe_mul(t1, t2, t1);
+    for i in 0..10 {
+        t1 = t1.square();               // fe_sq(t1, t1);
+    }
+    let t0 = &t1 * &t0;                 // fe_mul(t0, t1, t0);
+    let mut t1 = t0.square();           // fe_sq(t1, t0);
+    for i in 0..49 {
+        t1 = t1.square();               // fe_sq(t1, t1);
+    }
+    let t1 = &t1 * &t0;                 // fe_mul(t1, t1, t0);
+    let mut t2 = t1.square();           // fe_sq(t2, t1);
+    for i in 0..99 {
+        t2 = t2.square();               // fe_sq(t2, t2);
+    }
+    let mut t1 = &t2 * &t1;             // fe_mul(t1, t2, t1);
+    for i in 0..50 {
+        t1 = t1.square();               // fe_sq(t1, t1);
+    }
+    let t0 = &t1 * &t0;                 // fe_mul(t0, t1, t0);
+    let t0 = t0.square().square();      // fe_sq(t0, t0); fe_sq(t0, t0);
+    let t0 = &t0 * &uv7;                // fe_mul(t0, t0, uv7);
+
+    /* End fe_pow22523.c */
+    /* t0 = (uv^7)^((q-5)/8) */
+    let t0 = &t0 * &v3;                 // fe_mul(t0, t0, v3);
+    let r = &t0 * &u;                   // fe_mul(r, t0, u);
+
+    r
+}
+
+// Re-implementation from trezor ed25519-donna
+unsafe fn ge25519_fromfe_frombytes_vartime_trezor(u: &FieldElement) -> EdwardsPoint {
+    
+    let v = u.square2();                        // v = 2 * u^2
+    let w = &v + &FieldElement::one();          // w = 2 * u^2 + 1 
+
+    let y = &FE_MA2 * &v;                       // y = -2 * A^2 * u^2
+    let x = &w.square() + &y;                   // x = w^2 - 2 * A^2 * u^2
+
+    let rx1 = (&w * &x.invert()).pow_p58();  // rx = (w / x)^(m + 1)
+
+    // Re-implemented from monero crypto-ops.c
+    let rx2 = fe_divpowm1(&w, &x);
+
+    let mut rx = rx2;
+
+    let y = rx.square();
+
+    let mut x = &y * &x;
+    let mut y = &w - &x;
+    let mut z = FE_MA;
+
+    let mut negative = false;
+
+    // NOTE: doesn't look like any of the zero paths are being hit
+
+    if !bool::from(y.is_zero()) {
+        // Check if we have negative square root
+        y = &w + &x;
+
+        if !bool::from(y.is_zero()) {
+            // Execute the negative condition
+            negative = true;
+
+        } else {
+            // rx = rx * -1 * ed25519.sqroot(-2 * A * (A + 2) ) % q
+            rx = &rx * &FE_FFFB1;
+        }
+        
+    } else {
+        // y was 0
+        // rx = (rx * -1 * ed25519.sqroot(2 * A * (A + 2) ) ) % q 
+        rx = &rx * &FE_FFFB2;
+    }
+
+    let mut sign = 0;
+
+    if negative {
+        x = &x * &SQRT_M1;
+        y = &w - &x;
+
+        // NOTE: these don't seem to do anything..?
+        if !bool::from(y.is_zero()) {
+            y = &w + &x;
+            rx = &rx * &FE_FFFB3;
+
+        } else {
+            rx = &rx * &FE_FFFB4;
+        }
+        
+        sign = 1;
+    }
+    
+    // if ( (rx % 2) != sign ):
+    // TODO: is this direction correct?
+    if rx.is_negative().unwrap_u8() != sign {
+        // rx =  - (rx) % q 
+        rx.negate();
+    }
+
+    // rz = (z + w) % q
+    let rz = &z + &w;
+    // ry = (z - w) % q
+    let ry = &z - &w;
+    // rx = rx * rz % q
+    let rx = &rx * &rz;
+
+    let rt = FieldElement::one();
+
+    let p = EdwardsPoint::try_from_raw_u32(
+        *rx.as_ref(),
+        *ry.as_ref(),
+        *rz.as_ref(),
+        *rt.as_ref(),
+    ).unwrap();
+
+    p
+}
 
 /// Point scalar multiplication, `r = [s1]p1`, constant time
 #[no_mangle]
@@ -467,7 +746,6 @@ pub unsafe extern "C" fn ed25519_verify(
 
 // TODO: expand reduce helper, not sure what this is -meant- to be doing yet...
 fn expand_reduce(r: &[u8; 32]) -> FieldElement {
-
     let mut f = FieldElement::from_bytes(r);
 
     let mut ec = f.to_bytes();
@@ -601,7 +879,6 @@ mod test {
     }
 
     #[test]
-    #[ignore = "incomplete implementation"]
     fn test_ge25519_fromfe_frombytes_vartime() {
         
         let tests = &[
@@ -620,7 +897,7 @@ mod test {
         ), (
             "036291b42946c45b627a83701184f7d41647779cf5475d39e029443be33acacc",
             "ccc370b8bd978dc2d096eede50271c16922994b97959a9bd0171aaf5d4eb981f",
-        ),(
+        ), (
             "fff86285af4a9e8f777fb16723fea046207e0c5949934836acb43a36360ec7eb",
             "98fc4d1c6077c21c2993bcd7abb0af6b4daaa4c2fdea13eb4cd5ad5f7ce0de6f",
         ),(
@@ -669,7 +946,10 @@ mod test {
             // Check results match
             //assert_eq!(compressed_res, p);
             if compressed_res != p {
+                println!("**** FAILED ****");
                 failures += 1;
+            } else {
+                println!("**** OK ****");
             }
         }
 
@@ -677,7 +957,6 @@ mod test {
     }
 
     #[test]
-    #[ignore = "incomplete implementation"]
     fn test_expand_reduce() {
         let tests = &[(
             "95587a5ef6900fa8e32d6a41bd8090b1e33e694284323d1d1f02d69865f2bc15",
@@ -699,18 +978,60 @@ mod test {
 
             let i = decode_bytes::<32>(_i);
 
-            let r = expand_reduce(&i);
+            let r = unsafe { dalek_curve25519_expand_reduce(&i) };
 
             let result_hex = hex::encode(r.to_bytes());
 
             println!("result: {}\r\n", result_hex);
 
             if &result_hex != expected {
-                errors += 2;
+                errors += 1;
             }
         }
 
         assert!(errors == 0, "{}/{} tests failed", errors, tests.len());
     }
 
+    #[test]
+    fn constant_fe_ma2() {
+        let fe_ma2 = &FieldElement::minus_one() * &MONTGOMERY_A.square();
+        assert_eq!(&fe_ma2, &FE_MA2);
+    }
+
+    #[test]
+    fn constant_fe_fffbN() {
+        let two = &FieldElement::one() + &FieldElement::one();
+        let minus_two = &FieldElement::minus_one() * &two;
+
+        let a_a_2 = &MONTGOMERY_A * &(&MONTGOMERY_A + &two);
+
+        let fffb1 = &MINUS_ONE * &FieldElement::sqrt_ratio_i(
+            &(&minus_two * &a_a_2),
+            &FieldElement::one(),
+        ).1;
+        assert_eq!(&fffb1, &FE_FFFB1, "FFFB1");
+
+    
+        let fffb2 = &MINUS_ONE * &FieldElement::sqrt_ratio_i(
+            &(&two * &a_a_2),
+            &FieldElement::one(),
+        ).1;
+        assert_eq!(&fffb2, &FE_FFFB2, "FFFB2");
+
+        let n_sqrt_n_one = &MINUS_ONE * &SQRT_M1;
+    
+        // TODO: FFFB3 const _claims_ to be: `sqrt(-sqrt(-1) * A * (A + 2))` but _appears_ to be `-sqrt(-sqrt(-1) * A * (A + 2))` ..?
+
+        let fffb3 = &MINUS_ONE * &FieldElement::sqrt_ratio_i(
+            &(&(&MINUS_ONE * &SQRT_M1) * &a_a_2),
+            &FieldElement::one(),
+        ).1;
+        assert_eq!(&fffb3, &FE_FFFB3, "FFFB3");
+    
+        let fffb4 = FieldElement::sqrt_ratio_i(
+            &(&SQRT_M1 * &a_a_2),
+            &FieldElement::one(),
+        ).1;
+        assert_eq!(&fffb4, &FE_FFFB4, "FFFB4");
+    }
 }
