@@ -73,13 +73,14 @@ fn build_bindings() -> anyhow::Result<()> {
 fn build_lib() -> anyhow::Result<()> {
     println!("cargo:rerun-if-changed=tests/extensions.c");
 
-    // Compile library
+    // Compile base ed25519-donna
     // See `src/ffi.rs` for linking
     cc::Build::new()
         .include("vendor/ed25519-donna")
         .file("vendor/ed25519-donna/ed25519.c")
         .file("tests/extensions.c")
         // TODO: re-enable these
+        //.file("tests/keccak.c")
         //.file("tests/ed25519-keccak.c")
         //.file("tests/ed25519-sha3.c")
         // Using reference hasher for ease, could swap to rust version
@@ -88,6 +89,18 @@ fn build_lib() -> anyhow::Result<()> {
         .warnings(false)
         .compile("libed25519_donna.a");
 
+    // Compile ed25519-donna w/ keccak
+    #[cfg(nope)]
+    cc::Build::new()
+        .include("vendor/ed25519-donna")    
+        .file("tests/keccak.c")
+        .file("tests/ed25519-keccak.c")
+        .define("ED25519_CUSTOMHASH", "1")
+        .define("ED25519_TEST", "1")
+        .warnings(false)
+        .compile("libed25519_donna_keccak.a");
+
+    // Compile base curve25519-donna
     cc::Build::new()
         .include("vendor/curve25519-donna")
         .file("vendor/curve25519-donna/curve25519.c")

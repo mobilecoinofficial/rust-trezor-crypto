@@ -41,11 +41,11 @@ pub extern "C" fn dalek_ed25519_sign_open_keccak(
 /// Scalar multiplication using the provided basepoint via Keccak derivation
 // TODO(@ryankurte): added in an attempt to assuage NEM tests
 #[no_mangle]
-pub extern "C" fn dalek_curve25519_scalarmult_keccak(
+pub extern "C" fn dalek_curved25519_scalarmult_basepoint_keccak(
     o: *mut PublicKey,
     e: *mut SecretKey,
     bp: *mut PublicKey,
-) {
+) -> i32 {
     let (o, e, bp) = unsafe { (&mut (*o), &(*e), &(*bp)) };
 
     // Construct scalar via keccak hash
@@ -62,32 +62,41 @@ pub extern "C" fn dalek_curve25519_scalarmult_keccak(
 
     // Write back to pk
     o.copy_from_slice(&p.to_bytes());
+
+    return 0;
 }
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{decode_bytes, ed25519::*};
+    use crate::{decode_bytes, ffi, ed25519::*};
+
+    #[cfg_attr(feature = "build_donna", link(name = "ed25519_donna_keccak"))]
+    extern "C" {}
 
     pub struct Driver {
-        pub ed25519_publickey_keccak: unsafe extern "C" fn(*mut SecretKey, *mut PublicKey),
-        pub ed25519_sign_keccak:
+        pub publickey: unsafe extern "C" fn(*mut SecretKey, *mut PublicKey),
+        pub sign:
             unsafe extern "C" fn(*const u8, UInt, *mut SecretKey, *mut PublicKey, *mut Signature),
-        pub ed25519_sign_open_keccak:
+        pub sign_open:
             unsafe extern "C" fn(*const u8, UInt, *mut PublicKey, *mut Signature) -> i32,
+        pub scalarmult_basepoint: unsafe extern "C" fn(*mut PublicKey, *mut SecretKey, *mut PublicKey) -> i32,
     }
 
     const DALEK: Driver = Driver {
-        ed25519_publickey_keccak: dalek_ed25519_publickey_keccak,
-        ed25519_sign_keccak: dalek_ed25519_sign_keccak,
-        ed25519_sign_open_keccak: dalek_ed25519_sign_open_keccak,
+        publickey: dalek_ed25519_publickey_keccak,
+        sign: dalek_ed25519_sign_keccak,
+        sign_open: dalek_ed25519_sign_open_keccak,
+        scalarmult_basepoint: dalek_curved25519_scalarmult_basepoint_keccak,
     };
 
-    // TODO(@ryankurte): Donna driver
-
-    // TODO(@ryankurte): Interop tests
-
+    const DONNA: Driver = Driver {
+        publickey: ffi::ed25519_publickey_keccak,
+        sign: ffi::ed25519_sign_keccak,
+        sign_open: ffi::ed25519_sign_open_keccak,
+        scalarmult_basepoint: ffi::curved25519_scalarmult_basepoint_keccak,
+    };
 
     #[test]
     fn test_pubkey_derive() {
@@ -116,5 +125,29 @@ mod tests {
 
             assert_eq!(pub_key, p, "expected: {:02x?} actual: {:02x?}", pub_key, p);
         }
+    }
+
+    #[test]
+    fn test_pubkey_compat() {
+        // Generate random public key
+        let mut sk: SecretKey = [0u8; 32];
+        getrandom::getrandom(&mut sk).unwrap();
+
+        let mut dalek_pk = PublicKey::default();
+        unsafe { (DALEK.publickey)(
+            sk.as_mut_ptr() as *mut SecretKey,
+            dalek_pk.as_mut_ptr() as *mut PublicKey,
+        ) };
+
+        let mut donna_pk: PublicKey = [0u8; 32];
+        unsafe {
+            (DONNA.publickey)(
+                sk.as_mut_ptr() as *mut SecretKey,
+                donna_pk.as_mut_ptr() as *mut PublicKey,
+            )
+        };
+
+        // Compare results
+        assert_eq!(dalek_pk, donna_pk);
     }
 }

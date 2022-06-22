@@ -27,7 +27,7 @@ int ed25519_sign_open_keccak(const unsigned char *m, size_t mlen, const ed25519_
 
 void ed25519_sign_keccak(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, const ed25519_public_key pk, ed25519_signature RS);
 
-int ed25519_scalarmult_keccak(ed25519_public_key res, const ed25519_secret_key sk, const ed25519_public_key pk);
+int curved25519_scalarmult_basepoint_keccak(ed25519_public_key res, const ed25519_secret_key sk, const ed25519_public_key pk);
 
 
 // Sha3 parallel impl
@@ -37,5 +37,5 @@ int ed25519_sign_open_sha3(const unsigned char *m, size_t mlen, const ed25519_pu
 
 void ed25519_sign_sha3(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, const ed25519_public_key pk, ed25519_signature RS);
 
-int ed25519_scalarmult_sha3(ed25519_public_key res, const ed25519_secret_key sk, const ed25519_public_key pk);
+int curved25519_scalarmult_basepoint_sha3(ed25519_public_key res, const ed25519_secret_key sk, const ed25519_public_key pk);
 
