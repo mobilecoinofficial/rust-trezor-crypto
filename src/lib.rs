@@ -30,3 +30,12 @@ pub type UInt = cty::uint64_t;
 
 /// Alias for int on all platforms
 pub type Int = cty::c_int;
+
+#[cfg(test)]
+fn decode_bytes<const N: usize>(s: &str) -> [u8; N] {
+    let mut value = [0u8; N];
+
+    hex::decode_to_slice(s, &mut value).unwrap();
+
+    value
+}

@@ -71,7 +71,7 @@ pub unsafe extern "C" fn ge25519_set_neutral(r: *mut Ge25519) {
     (*r) = Ge25519::from(&EdwardsPoint::identity());
 }
 
-/// Point addition, `r = a + b`
+/// Point addition, `r = a + b` if signbit == 0, `r = a - b` if signbit == 1
 #[no_mangle]
 pub unsafe extern "C" fn ge25519_add(
     r: *mut Ge25519,
@@ -89,13 +89,12 @@ pub unsafe extern "C" fn ge25519_add(
         Err(_) => return,
     };
 
-    // TODO(@ryankurte): work out what the sign bit is -actually- doing?
-    let r1 = match signbit != 0 {
+    let r1 = match signbit == 0 {
         true => a1 + b1,
         false => a1 - b1,
     };
 
-    (*r).update(&r1)
+    *r = Ge25519::from(&r1);
 }
 
 /// Point doubling, `r = 2 * p`
@@ -758,6 +757,8 @@ fn expand_reduce(r: &[u8; 32]) -> FieldElement {
 mod test {
     use curve25519_dalek::edwards::EdwardsBasepointTable;
 
+    use crate::decode_bytes;
+    
     use super::*;
 
     fn decode_point(s: &str) -> Ge25519 {
@@ -779,13 +780,7 @@ mod test {
         s.to_unpacked_u32()
     }
 
-    fn decode_bytes<const N: usize>(s: &str) -> [u8; N] {
-        let mut value = [0u8; N];
 
-        hex::decode_to_slice(s, &mut value).unwrap();
-
-        value
-    }
 
     /// `test_encoding` from test_apps.monero.crypto.py
     #[test]
@@ -891,9 +886,11 @@ mod test {
         // Vectors from monero `tests/crypto/tests.txt`
         // https://github.com/monero-project/monero/blob/release-v0.13/tests/crypto/tests.txt
         (
-            "83efb774657700e37291f4b8dd10c839d1c739fd135c07a2fd7382334dafdd6a","2789ecbaf36e4fcb41c6157228001538b40ca379464b718d830c58caae7ea4ca",
+            "83efb774657700e37291f4b8dd10c839d1c739fd135c07a2fd7382334dafdd6a",
+            "2789ecbaf36e4fcb41c6157228001538b40ca379464b718d830c58caae7ea4ca",
         ), (
-            "5c380f98794ab7a9be7c2d3259b92772125ce93527be6a76210631fdd8001498", "31a1feb4986d42e2137ae061ea031838d24fa523234954cf8860bcd42421ae94",
+            "5c380f98794ab7a9be7c2d3259b92772125ce93527be6a76210631fdd8001498",
+            "31a1feb4986d42e2137ae061ea031838d24fa523234954cf8860bcd42421ae94",
         ), (
             "036291b42946c45b627a83701184f7d41647779cf5475d39e029443be33acacc",
             "ccc370b8bd978dc2d096eede50271c16922994b97959a9bd0171aaf5d4eb981f",

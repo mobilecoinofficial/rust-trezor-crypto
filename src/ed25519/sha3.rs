@@ -8,7 +8,8 @@ use sha3::Sha3_512;
 /// Derives a public key from a private key using sha3 digest
 #[no_mangle]
 pub extern "C" fn dalek_ed25519_publickey_sha3(sk: *mut SecretKey, pk: *mut PublicKey) {
-    super::ed25519_publickey::<Sha3_512>(sk, pk)
+    let (sk, pk) = unsafe { (&(*sk), &mut (*pk)) };
+    super::ed25519_publickey_digest::<Sha3_512>(sk, pk)
 }
 
 /// Signs a message using the provided secret key using sha3 digest

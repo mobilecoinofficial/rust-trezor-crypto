@@ -4,6 +4,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use cty::c_int;
 use curve25519_dalek::scalar::Scalar;
 
+
 /// Bignum25519 type for FFI, maps to `uint32_t bignum25519[10]` in `curve25519-donna-32bit.h`
 pub type Bignum25519 = [u32; 10];
 

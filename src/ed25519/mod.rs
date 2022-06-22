@@ -4,9 +4,10 @@
 
 use curve25519_dalek::{
     constants::ED25519_BASEPOINT_TABLE,
-    digest::{consts::U64, Digest},
+    digest::{consts::U64, Digest}, montgomery::MontgomeryPoint,
 };
-use ed25519_dalek::{Sha512, Signer, Verifier};
+use ed25519_dalek::{Sha512, Signer, Verifier, ExpandedSecretKey};
+use ::sha3::Keccak256;
 
 use crate::{Int, UInt};
 
@@ -48,11 +49,6 @@ pub mod sha3;
 /// Compatible with ed25519-donna [ed25519_publickey](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L45)
 #[no_mangle]
 pub extern "C" fn dalek_ed25519_publickey(sk: *mut SecretKey, pk: *mut PublicKey) {
-    ed25519_publickey::<Sha512>(sk, pk)
-}
-
-/// Internal public key function, generic over digest types
-fn ed25519_publickey<D: Digest<OutputSize = U64>>(sk: *mut SecretKey, pk: *mut PublicKey) {
     let (sk, pk) = unsafe { (&(*sk), &mut (*pk)) };
 
     // Parse out secret key
@@ -70,6 +66,33 @@ fn ed25519_publickey<D: Digest<OutputSize = U64>>(sk: *mut SecretKey, pk: *mut P
 
     // Generate and write public key
     let public_key = ed25519_dalek::PublicKey::from(&secret_key);
+    pk.copy_from_slice(public_key.as_bytes());
+}
+
+/// Generates a public key from the provided secret key using the specified [`Digest`]
+pub fn ed25519_publickey_digest<D: Digest<OutputSize = U64>>(sk: &SecretKey, pk: &mut PublicKey) {
+    // Generate expanded secret key from hash
+    let mut h = D::new();
+    h.update(&*sk);
+
+    // Copy into buffer and clamp
+    let mut buff = [0u8; 64];
+    buff.copy_from_slice(h.finalize().as_slice());
+
+    buff[0]  &= 248;
+    buff[31] &=  63;
+    buff[31] |=  64;
+
+    // Generate expanded key
+    let expanded = match ExpandedSecretKey::from_bytes(&buff) {
+        Ok(v) => v,
+        Err(_e) => return,
+    };
+
+    // Extract public key
+    let public_key = ed25519_dalek::PublicKey::from(&expanded);
+
+    // Write back to arg
     pk.copy_from_slice(public_key.as_bytes());
 }
 
@@ -234,7 +257,7 @@ pub extern "C" fn dalek_ed25519_sign_open_batch(
 }
 
 /// Generate random bytes using the system RNG
-// TODO(@ryankurte): possible we don't need this
+// TODO(@ryankurte): possible we don't need this / appears primarily used for testing
 #[no_mangle]
 pub extern "C" fn dalek_ed25519_randombytes_unsafe(out: *mut u8, count: UInt) {
     let buff = unsafe { core::slice::from_raw_parts_mut(out, count as usize) };
@@ -284,21 +307,26 @@ pub extern "C" fn dalek_curve25519_scalarmult(
     let mut ec = [0u8; 32];
     ec.copy_from_slice(e);
 
-    // Copy basepoint (public key) into editable slice
-    let mut bpc = [0u8; 32];
-    bpc.copy_from_slice(bp);
-
     // Clamp secret key
     ec[0] &= 248;
     ec[31] &= 127;
     ec[31] |= 64;
 
-    // Compute DH
-    let p = { x25519_dalek::x25519(ec, bpc) };
+    let e = curve25519_dalek::scalar::Scalar::from_bits(ec);
+
+    // Copy basepoint (public key) into slice
+    let mut bpc = [0u8; 32];
+    bpc.copy_from_slice(bp);
+
+    let bp = MontgomeryPoint(bpc);
+
+    // Compute `e * Montgomery(bp)` (ie. x25519 DH)
+    let p = &e * &bp;
 
     // Write back to pk
-    o.copy_from_slice(&p);
+    o.copy_from_slice(&p.to_bytes());
 }
+
 
 /// Generate a public key using the expanded (`sk + sk_ext`) form of the secret key
 #[no_mangle]
