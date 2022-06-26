@@ -112,7 +112,7 @@ pub unsafe extern "C" fn dalek_ge25519_double(r: *mut Ge25519, p: *const Ge25519
 
 /// Multiply by cofactor, `r = [8]P`
 #[no_mangle]
-pub unsafe extern "C" fn ge25519_mul8(r: *mut Ge25519, p: *const Ge25519) {
+pub unsafe extern "C" fn dalek_ge25519_mul8(r: *mut Ge25519, p: *const Ge25519) {
     let p1 = match EdwardsPoint::try_from(&*p) {
         Ok(v) => v,
         Err(_) => return,
@@ -346,7 +346,7 @@ const FE_FFFB4: FieldElement = FieldElement::from_raw_u32([
 ///
 // TODO: incomplete / broken
 #[no_mangle]
-pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
+pub unsafe extern "C" fn dalek_ge25519_fromfe_frombytes_vartime(
     r: *mut Ge25519,
     p: *const [u8; 32],
 ) {
