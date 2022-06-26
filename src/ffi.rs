@@ -11,16 +11,6 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 // so mutability of generated APIs is unfortunately all over the show...
 // see: https://github.com/rust-lang/rust-bindgen/issues/1962
 
-// Link donna libraries (and libc) if enabled with feature `donna`
-#[cfg_attr(feature = "build_donna", link(name = "ed25519_donna"))]
-extern "C" {}
-
-#[cfg_attr(feature = "build_donna", link(name = "curve25519_donna"))]
-extern "C" {}
-
-#[cfg_attr(feature = "build_donna", link(name = "c"))]
-extern "C" {}
-
 pub type PublicKey = crate::ffi::ed25519_public_key;
 
 pub type SecretKey = crate::ffi::ed25519_secret_key;

@@ -15,12 +15,14 @@ license = "BSD-3-Clause"
 [features]
 std = [ ]
 build_donna = []
-
-default = [ "std", "build_donna" ]
+test_helpers = [ "rand_core", "rand_core/std" ]
+default = [ "std", "build_donna", "test_helpers" ]
 
 [dependencies]
 cty = "0.2.2"
 getrandom = { version = "0.2.6", default_features = false }
+rand_core = { version = "0.5.1", default_features = false, optional = true }
+
 static_assertions = "1.1.0"
 
 sha2 = { version = "0.9.9", default_features = false }
@@ -28,7 +30,8 @@ sha3 = { version = "0.9.1", default_features = false }
 byteorder = { version = "1.4.3", default_features = false }
 subtle = { version = "2.4.1", default_features = false }
 heapless = "0.7.14"
-
+mem_macros = "1.0.1"
+hex = { version = "0.4.3", optional = true }
 
 [dependencies.curve25519-dalek]
 version = "3.2.1"
@@ -60,6 +63,10 @@ libc = "0.2.126"
 
 # NOTE: old rand-core required for dalek crates
 rand_core = { version = "0.5.1", features = [ "std" ] }
+
+ed25519-donna-sys = { path = "./deps/ed25519-donna-sys" }
+ed25519-donna-keccak-sys = { path = "./deps/ed25519-donna-keccak-sys" }
+ed25519-donna-sha3-sys = { path = "./deps/ed25519-donna-sha3-sys" }
 
 [patch.crates-io]
 

@@ -7,7 +7,6 @@ use curve25519_dalek::{
     digest::{consts::U64, Digest}, montgomery::MontgomeryPoint,
 };
 use ed25519_dalek::{Sha512, Signer, Verifier, ExpandedSecretKey};
-use ::sha3::Keccak256;
 
 use crate::{Int, UInt};
 
@@ -70,7 +69,7 @@ pub extern "C" fn dalek_ed25519_publickey(sk: *mut SecretKey, pk: *mut PublicKey
 }
 
 /// Generates a public key from the provided secret key using the specified [`Digest`]
-pub fn ed25519_publickey_digest<D: Digest<OutputSize = U64>>(sk: &SecretKey, pk: &mut PublicKey) {
+fn ed25519_publickey_digest<D: Digest<OutputSize = U64>>(sk: &SecretKey, pk: &mut PublicKey) {
     // Generate expanded secret key from hash
     let mut h = D::new();
     h.update(&*sk);
@@ -165,24 +164,35 @@ fn ed25519_sign<D: Digest<OutputSize = U64>>(
         )
     };
 
-    // Parse keys
-    let secret_key = match ed25519_dalek::SecretKey::from_bytes(sk) {
-        Ok(v) => v,
-        Err(_e) => return,
-    };
     let public_key = match ed25519_dalek::PublicKey::from_bytes(pk) {
         Ok(v) => v,
         Err(_e) => return,
     };
 
-    // Generate edpanded for signing
-    let expanded_key = ed25519_dalek::ExpandedSecretKey::from(&secret_key);
+    // Expand secret key using provided digest
+    let mut h = D::new();
+    h.update(&*sk);
 
+    // Copy into buffer and clamp
+    let mut buff = [0u8; 64];
+    buff.copy_from_slice(h.finalize().as_slice());
+
+    buff[0]  &= 248;
+    buff[31] &=  63;
+    buff[31] |=  64;
+
+    // Generate expanded key
+    let secret_key = match ExpandedSecretKey::from_bytes(&buff) {
+        Ok(v) => v,
+        Err(_e) => return,
+    };
+
+    // Generate message hash for signing
     let mut d = D::new();
     d.update(m);
 
     // Sign message
-    let signature = expanded_key.sign_digest::<D>(m, &public_key);
+    let signature = secret_key.sign_digest::<D>(m, &public_key);
 
     // Write signature back
     sig.copy_from_slice(signature.as_ref());
@@ -393,4 +403,36 @@ pub extern "C" fn dalek_ed25519_sign_ext(
 
     // Write to provided buffer
     sig.copy_from_slice(signature.as_ref());
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    // Vectors from `test_trezor.crypto.curve.curve25519.py`
+    const SCALARMULT_VECS: (&str, &str, &str) = (
+        "38c9d9b17911de26ed812f5cc19c0029e8d016bcbc6078bc9db2af33f1761e4a",
+        "311b6248af8dabec5cc81eac5bf229925f6d218a12e0547fb1856e015cc76f5d",
+        "a93dbdb23e5c99da743e203bd391af79f2b83fb8d0fd6ec813371c71f08f2d4d",
+    );
+
+    #[test]
+    fn curve25519_scalarmult_vectors() {
+        let (mut sk, mut pk, mut sess) = ([0u8; 32], [0u8; 32], [0u8; 32]);
+
+        hex::decode_to_slice(SCALARMULT_VECS.0, &mut sk).unwrap();
+        hex::decode_to_slice(SCALARMULT_VECS.1, &mut pk).unwrap();
+        hex::decode_to_slice(SCALARMULT_VECS.2, &mut sess).unwrap();
+
+        let mut sess2 = [0u8; 32];
+        unsafe {
+            (dalek_curve25519_scalarmult)(
+                sess2.as_mut_ptr() as *mut Scalar,
+                sk.as_mut_ptr() as *mut SecretKey,
+                pk.as_mut_ptr() as *mut PublicKey,
+            )
+        };
+
+        assert_eq!(&sess[..], &sess2[..])
+    }
 }

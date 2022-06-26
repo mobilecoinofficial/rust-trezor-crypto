@@ -3,6 +3,7 @@
 use super::{ed25519_sign, PublicKey, SecretKey, Signature};
 use crate::{Int, UInt};
 
+use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
 use sha3::Sha3_512;
 
 /// Derives a public key from a private key using sha3 digest
@@ -33,6 +34,16 @@ pub extern "C" fn dalek_ed25519_sign_open_sha3(
     sig: *mut Signature,
 ) -> Int {
     super::ed25519_sign_open::<Sha3_512>(m, mlen, pk, sig)
+}
+
+/// Scalar multiplication via Keccak derivation using the default basepoint
+// TODO(@ryankurte): WIP in an attempt to assuage NEM tests
+#[no_mangle]
+pub extern "C" fn dalek_curved25519_scalarmult_basepoint_sha3(
+    o: *mut PublicKey,
+    s: *mut SecretKey,
+) {
+    super::dalek_curved25519_scalarmult_basepoint(o, s);
 }
 
 #[cfg(test)]

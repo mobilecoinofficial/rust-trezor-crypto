@@ -3,10 +3,13 @@
 //! and/or refactor to remove the need for these in the trezor fw?
 
 #include <stdint.h>
+#include <stdlib.h>
+#include <stddef.h>
 
 #include "ed25519.h"
 #include "ed25519-donna.h"
 #include "ed25519-hash.h"
+
 
 static void memzero(void* target, size_t len) {
     for (int i=0; i<len; i++) {

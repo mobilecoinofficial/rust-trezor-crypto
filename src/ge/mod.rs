@@ -757,7 +757,7 @@ fn expand_reduce(r: &[u8; 32]) -> FieldElement {
 mod test {
     use curve25519_dalek::edwards::EdwardsBasepointTable;
 
-    use crate::decode_bytes;
+    use crate::test::decode_bytes;
     
     use super::*;
 
