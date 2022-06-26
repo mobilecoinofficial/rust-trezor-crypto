@@ -22,11 +22,14 @@ pub struct Driver {
     pub sign_open:
         unsafe extern "C" fn(*const u8, UInt, *mut PublicKey, *mut Signature) -> i32,
     
-    /// Scalar multiplication with the provided basepoint
-    pub scalarmult: Option<unsafe extern "C" fn(*mut PublicKey, *mut SecretKey, *mut PublicKey)>,
+    /// Curve scalar multiplication with the provided basepoint
+    pub curve25519_scalarmult: Option<unsafe extern "C" fn(*mut PublicKey, *mut SecretKey, *mut PublicKey)>,
 
-    /// Scalar multiplication with default (edwards) basepoint
-    pub scalarmult_basepoint: unsafe extern "C" fn(*mut PublicKey, *mut SecretKey),
+    /// Curve scalar multiplication with default basepoint
+    pub curved25519_scalarmult_basepoint: unsafe extern "C" fn(*mut PublicKey, *mut SecretKey),
+
+    /// Point multiplication with the provided basepoint
+    pub ed25519_scalarmult: Option<unsafe extern "C" fn(*mut PublicKey, *mut SecretKey, *mut PublicKey) -> i32>,
 
     /// Batch verify messages
     pub sign_open_batch: Option<unsafe extern "C" fn(
@@ -224,7 +227,7 @@ pub fn sign_verify(signer: &Driver, verifier: &Driver) {
 }
 
 /// Test scalar multiplication against the provided basepoint
-pub fn scalarmult(a: &Driver, b: &Driver) {
+pub fn curve25519_scalarmult(a: &Driver, b: &Driver) {
     let mut rng = rand_core::OsRng;
 
     use curve25519_dalek::scalar::Scalar as S;
@@ -242,7 +245,7 @@ pub fn scalarmult(a: &Driver, b: &Driver) {
 
         let mut a_s = [0u8; 32];
         unsafe {
-            (a.scalarmult.unwrap())(
+            (a.curve25519_scalarmult.unwrap())(
                 a_s.as_mut_ptr() as *mut Scalar,
                 s.as_mut_ptr() as *mut Scalar,
                 bp.as_mut_ptr() as *mut Scalar,
@@ -251,12 +254,65 @@ pub fn scalarmult(a: &Driver, b: &Driver) {
 
         let mut b_s = [0u8; 32];
         unsafe {
-            (b.scalarmult.unwrap())(
+            (b.curve25519_scalarmult.unwrap())(
                 b_s.as_mut_ptr() as *mut Scalar,
                 s.as_mut_ptr() as *mut Scalar,
                 bp.as_mut_ptr() as *mut Scalar,
             );
         }
+
+        assert_eq!(a_s, b_s);
+    }
+}
+
+/// Test point multiplication against the provided basepoint
+pub fn ed25519_scalarmult(a: &Driver, b: &Driver) {
+    let mut rng = rand_core::OsRng;
+
+    use curve25519_dalek::scalar::Scalar as S;
+
+    // Generate keys
+    let mut sk: SecretKey = [0u8; 32];
+    getrandom::getrandom(&mut sk).unwrap();
+    let mut pk: PublicKey = [0u8; 32];
+    unsafe {
+        (a.publickey)(
+            sk.as_mut_ptr() as *mut SecretKey,
+            pk.as_mut_ptr() as *mut PublicKey,
+        )
+    };
+
+    // Test set, zero one and a random scalar
+    let tests = &[
+        S::zero(),
+        S::one(),
+        S::random(&mut rng),
+    ];
+
+    for bp in tests {
+        let mut bp = bp.as_bytes().to_vec();
+
+        let mut a_s = [0u8; 32];
+        unsafe {
+            (a.ed25519_scalarmult.unwrap())(
+                a_s.as_mut_ptr() as *mut PublicKey,
+                sk.as_mut_ptr() as *mut SecretKey,
+                bp.as_mut_ptr() as *mut PublicKey,
+            );
+        }
+
+        println!("a: {:02x?}", a_s);
+
+        let mut b_s = [0u8; 32];
+        unsafe {
+            (b.ed25519_scalarmult.unwrap())(
+                b_s.as_mut_ptr() as *mut PublicKey,
+                sk.as_mut_ptr() as *mut SecretKey,
+                bp.as_mut_ptr() as *mut PublicKey,
+            );
+        }
+
+        println!("b: {:02x?}", b_s);
 
         assert_eq!(a_s, b_s);
     }
@@ -280,7 +336,7 @@ pub fn scalarmult_basepoint(a: &Driver, b: &Driver) {
 
         let mut a_s = [0u8; 32];
         unsafe {
-            (a.scalarmult_basepoint)(
+            (a.curved25519_scalarmult_basepoint)(
                 a_s.as_mut_ptr() as *mut Scalar,
                 s.as_mut_ptr() as *mut Scalar,
             );
@@ -288,7 +344,7 @@ pub fn scalarmult_basepoint(a: &Driver, b: &Driver) {
 
         let mut b_s = [0u8; 32];
         unsafe {
-            (b.scalarmult_basepoint)(
+            (b.curved25519_scalarmult_basepoint)(
                 b_s.as_mut_ptr() as *mut Scalar,
                 s.as_mut_ptr() as *mut Scalar,
             );

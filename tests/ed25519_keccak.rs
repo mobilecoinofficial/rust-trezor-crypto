@@ -12,8 +12,9 @@ const DALEK: Driver = Driver {
     publickey: dalek_ed25519_publickey_keccak,
     sign: dalek_ed25519_sign_keccak,
     sign_open: dalek_ed25519_sign_open_keccak,
-    scalarmult_basepoint: dalek_curved25519_scalarmult_basepoint_keccak,
-    scalarmult: None,
+    curved25519_scalarmult_basepoint: dalek_curved25519_scalarmult_basepoint_keccak,
+    curve25519_scalarmult: None,
+    ed25519_scalarmult: Some(dalek_curve25519_scalarmult_keccak),
     sign_open_batch: None,
 };
 
@@ -22,8 +23,9 @@ const DONNA: Driver = Driver {
     publickey: ffi::ed25519_publickey_keccak,
     sign: ffi::ed25519_sign_keccak,
     sign_open: ffi::ed25519_sign_open_keccak,
-    scalarmult_basepoint: ffi::curved25519_scalarmult_basepoint_keccak,
-    scalarmult: None,
+    curved25519_scalarmult_basepoint: ffi::curved25519_scalarmult_basepoint_keccak,
+    curve25519_scalarmult: None,
+    ed25519_scalarmult: Some(ffi::ed25519_scalarmult_keccak),
     sign_open_batch: None,
 };
 
@@ -55,6 +57,11 @@ fn dalek_sign_donna_verify() {
 }
 
 #[test]
-fn scalarmult_basepoint() {
+fn ed25519_scalarmult() {
+    test::ed25519_scalarmult(&DALEK, &DONNA);
+}
+
+#[test]
+fn curved25519_scalarmult_basepoint() {
     test::scalarmult_basepoint(&DALEK, &DONNA);
 }

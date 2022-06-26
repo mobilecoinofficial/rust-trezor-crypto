@@ -1,13 +1,14 @@
 //! ed25519 API using `keccak512` signatures, equivalent to `ed25519-donna` APIs generated with a custom `keccak512` hasher (see [`tests/ed25519-keccak.c`](https://github.com/ryankurte/rust-trezor-crypto/blob/main/tests/ed25519-keccak.c))
 
 use super::{PublicKey, SecretKey, Signature};
-use crate::{Int, UInt};
+use crate::{Int, UInt, modm::expand256_modm};
 
 use curve25519_dalek::{
     montgomery::MontgomeryPoint,
-    constants::ED25519_BASEPOINT_TABLE,
+    constants::{ED25519_BASEPOINT_TABLE, MINUS_ONE}, edwards::CompressedEdwardsY,
 };
 use sha3::{Digest, Keccak512};
+use subtle::ConditionallyNegatable;
 
 /// Derives a public key from a private key using keccak digest
 #[no_mangle]
@@ -46,30 +47,40 @@ pub extern "C" fn dalek_ed25519_sign_open_keccak(
 #[no_mangle]
 pub extern "C" fn dalek_curve25519_scalarmult_keccak(
     o: *mut PublicKey,
-    e: *mut SecretKey,
+    sk: *mut SecretKey,
     bp: *mut PublicKey,
 ) -> i32 {
-    let (o, e, bp) = unsafe { (&mut (*o), &(*e), &(*bp)) };
+    let (o, sk, bp) = unsafe { (&mut (*o), &(*sk), &(*bp)) };
+
+    // Construct expanded secret key using digest
+    let mut h = Keccak512::new();
+    h.update(&*sk);
+
+    // Copy into buffer and clamp
+    let mut buff = [0u8; 32];
+    buff.copy_from_slice(&h.finalize().as_slice()[..32]);
+
+    buff[0]  &= 248;
+    buff[31] &=  63;
+    buff[31] |=  64;
 
     // Construct scalar via keccak hash
-    let e = curve25519_dalek::scalar::Scalar::hash_from_bytes::<Keccak512>(e);
+    let mut e = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(buff);
 
-    // Copy basepoint (public key) into slice
-    let mut bpc = [0u8; 32];
-    bpc.copy_from_slice(bp);
+    // Expand basepoint to ge25519 pt
+    let bp = match CompressedEdwardsY(*bp).decompress() {
+        Some(v) => v,
+        None => return 1,
+    };
 
-    // Clamp secret key
-    bpc[0] &= 248;
-    bpc[31] &= 127;
-    bpc[31] |= 64;
+    // Compute `e * bp` (ie. x25519 DH)
+    let mut p = &e * &bp;
 
-    let bp = MontgomeryPoint(bpc);
-
-    // Compute `e * Montgomery(bp)` (ie. x25519 DH)
-    let p = &e * &bp;
+    // Compress result point
+    let u = p.compress();
 
     // Write back to pk
-    o.copy_from_slice(&p.to_bytes());
+    o.copy_from_slice(&u.to_bytes());
 
     return 0;
 }
