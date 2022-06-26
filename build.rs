@@ -4,15 +4,12 @@ fn main() -> anyhow::Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=wrapper.h");
 
-    // Build donna C FFI bindings for testing
-    #[cfg(feature = "build_donna")]
     build_bindings()?;
 
     Ok(())
 }
 
-// Build C bindings for test use
-#[cfg(feature = "build_donna")]
+// Build FFI bindings for testing
 fn build_bindings() -> anyhow::Result<()> {
     let out_path = PathBuf::from(std::env::var("OUT_DIR").unwrap());
 

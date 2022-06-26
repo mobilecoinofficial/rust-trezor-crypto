@@ -13,7 +13,7 @@ license = "BSD-3-Clause"
 [lib]
 
 [features]
-std = [ ]
+std = [ "rand_core/std" ]
 build_donna = []
 test_helpers = [ "rand_core", "rand_core/std" ]
 default = [ "std", "build_donna", "test_helpers" ]

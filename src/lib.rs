@@ -5,7 +5,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(doc_cfg)]
 
-#[cfg(feature = "build_donna")]
+//#[cfg(feature = "build_donna")]
 pub mod ffi;
 
 #[cfg(feature = "test_helpers")]
