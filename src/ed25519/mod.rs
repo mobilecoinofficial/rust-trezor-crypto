@@ -44,7 +44,7 @@ pub mod keccak;
 
 pub mod sha3;
 
-//pub mod cosi;
+pub mod cosi;
 
 /// Derives a public key from a private key (using the default `sha512` digest)
 ///
