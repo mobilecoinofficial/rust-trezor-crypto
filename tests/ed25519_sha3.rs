@@ -1,5 +1,5 @@
 
-use ed25519_donna_sha3_sys;
+use {ed25519_donna_sha3_sys as _};
 
 use trezor_crypto_lib::{
     ffi,
@@ -15,7 +15,6 @@ const DALEK: Driver = Driver {
     curved25519_scalarmult_basepoint: dalek_curved25519_scalarmult_basepoint_sha3,
     curve25519_scalarmult: None,
     ed25519_scalarmult: None,
-    sign_open_batch: None,
 };
 
 /// Donna driver implementation (sha3 build via FFI)
@@ -26,7 +25,6 @@ const DONNA: Driver = Driver {
     curved25519_scalarmult_basepoint: ffi::curved25519_scalarmult_basepoint_sha3,
     curve25519_scalarmult: None,
     ed25519_scalarmult: None,
-    sign_open_batch: None,
 };
 
 

@@ -4,9 +4,7 @@ use core::ops::{Deref, DerefMut};
 
 pub use crate::UInt;
 use crate::{
-    ed25519::consts::{PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SIGNATURE_LENGTH},
-    ed25519::{self, PublicKey, Scalar, SecretKey, Signature},
-    ffi,
+    ed25519::{PublicKey, Scalar, SecretKey, Signature},
 };
 
 /// Basic driver object for compatibility testing of ed25519 operations
@@ -30,17 +28,6 @@ pub struct Driver {
 
     /// Point multiplication with the provided basepoint
     pub ed25519_scalarmult: Option<unsafe extern "C" fn(*mut PublicKey, *mut SecretKey, *mut PublicKey) -> i32>,
-
-    /// Batch verify messages
-    pub sign_open_batch: Option<unsafe extern "C" fn(
-        *mut *const u8,
-        *mut UInt,
-        *mut *const u8,
-        *mut *const u8,
-        UInt,
-        *mut i32,
-    ) -> i32>,
-
 }
 
 /// Extended driver includes basic driver and methods using extended keys
@@ -71,61 +58,6 @@ impl Deref for ExtendedDriver {
 impl DerefMut for ExtendedDriver {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.driver
-    }
-}
-
-
-pub struct Batch<const N: usize, const M: usize = 128> {
-    pub secret_keys: [SecretKey; N],
-    pub public_keys: [PublicKey; N],
-    pub messages: [[u8; M]; N],
-    pub lengths: [UInt; N],
-    pub signatures: [Signature; N],
-}
-
-impl<const N: usize, const M: usize> Batch<N, M> {
-    /// Generate a collection for batch verification
-    pub fn new(signer: &Driver) -> Self {
-        let mut secret_keys = [[0u8; SECRET_KEY_LENGTH]; N];
-        let mut public_keys = [[0u8; PUBLIC_KEY_LENGTH]; N];
-
-        let mut messages = [[0u8; M]; N];
-        let mut signatures = [[0u8; SIGNATURE_LENGTH]; N];
-
-        for i in 0..N {
-            // Generate random secret key
-            getrandom::getrandom(&mut secret_keys[i]).unwrap();
-
-            // Generate matching public key
-            unsafe {
-                (signer.publickey)(
-                    secret_keys[i].as_mut_ptr() as *mut SecretKey,
-                    public_keys[i].as_mut_ptr() as *mut PublicKey,
-                )
-            };
-
-            // Generate message
-            getrandom::getrandom(&mut messages[i]).unwrap();
-
-            // Generate signature
-            unsafe {
-                (signer.sign)(
-                    messages[i].as_mut_ptr(),
-                    M as UInt,
-                    secret_keys[i].as_mut_ptr() as *mut SecretKey,
-                    public_keys[i].as_mut_ptr() as *mut PublicKey,
-                    signatures[i].as_mut_ptr() as *mut Signature,
-                )
-            };
-        }
-
-        Self {
-            secret_keys,
-            public_keys,
-            messages,
-            lengths: [M as UInt; N],
-            signatures,
-        }
     }
 }
 
@@ -354,69 +286,7 @@ pub fn scalarmult_basepoint(a: &Driver, b: &Driver) {
     }
 }
 
-
-/// Test batch verification
-pub fn batch_verify<const N: usize>(signer: &Driver, verifier: &Driver) {
-    // Generate batch for processing
-    let Batch {
-        public_keys,
-        mut messages,
-        signatures,
-        lengths,
-        ..
-    } = Batch::<N>::new(signer);
-
-    // Remap into arrays of pointers
-    let mut pk: Vec<_> = public_keys.iter().map(|ref v| v.as_ptr()).collect();
-    let mut m: Vec<_> = messages
-        .iter_mut()
-        .map(|ref mut v| v.as_mut_ptr())
-        .collect();
-    let mut mlen: Vec<_> = lengths.iter().map(|v| *v).collect();
-    let mut sigs: Vec<_> = signatures.iter().map(|ref mut v| v.as_ptr()).collect();
-
-    // Perform batch verification
-    let mut valid = [0; N];
-
-    // Valid good batch
-    let res = unsafe {
-        (verifier.sign_open_batch.unwrap())(
-            m.as_mut_ptr() as *mut *const u8,
-            mlen.as_mut_ptr() as *mut UInt,
-            pk.as_mut_ptr() as *mut *const u8,
-            sigs.as_mut_ptr() as *mut *const u8,
-            N as UInt,
-            valid.as_mut_ptr(),
-        )
-    };
-
-    assert_eq!(res, 0, "Expected success");
-    assert_eq!(valid, [1; N], "Unexpected success flags");
-
-    // Invalidate first message
-    let d = m[0] as *mut u8;
-    unsafe { (*d) ^= 0xFF };
-
-    // Valid batch with error
-    let res = unsafe {
-        (verifier.sign_open_batch.unwrap())(
-            m.as_mut_ptr() as *mut *const u8,
-            mlen.as_mut_ptr() as *mut UInt,
-            pk.as_mut_ptr() as *mut *const u8,
-            sigs.as_mut_ptr() as *mut *const u8,
-            N as UInt,
-            valid.as_mut_ptr(),
-        )
-    };
-
-    assert!(res != 0, "expected failure");
-    let mut expected = [1; N];
-    expected[0] = 0;
-    assert_eq!(valid, expected, "unexpected failure flags");
-}
-
 /// Test expanded public key generation
-
 pub fn publickey_ext(a: &ExtendedDriver, b: &ExtendedDriver) {
     // Create new secret key and generate
     let mut sk: SecretKey = [0u8; 32];

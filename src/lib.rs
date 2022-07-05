@@ -5,7 +5,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(doc_cfg)]
 
-//#[cfg(feature = "build_donna")]
+#[cfg(feature = "build_donna")]
 pub mod ffi;
 
 #[cfg(feature = "test_helpers")]
@@ -18,6 +18,8 @@ pub mod ge;
 pub mod modm;
 
 pub mod hashes;
+
+mod consts;
 
 // Bindgen / cty have some weird behaviours when mapping `size_t` on different platforms.
 // use [`Uint`] in place of `cty::size_t` to avoid this.

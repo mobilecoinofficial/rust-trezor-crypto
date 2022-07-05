@@ -1,5 +1,5 @@
 
-use ed25519_donna_keccak_sys;
+use {ed25519_donna_keccak_sys as _};
 
 use trezor_crypto_lib::{
     ffi,
@@ -14,8 +14,7 @@ const DALEK: Driver = Driver {
     sign_open: dalek_ed25519_sign_open_keccak,
     curved25519_scalarmult_basepoint: dalek_curved25519_scalarmult_basepoint_keccak,
     curve25519_scalarmult: None,
-    ed25519_scalarmult: Some(dalek_curve25519_scalarmult_keccak),
-    sign_open_batch: None,
+    ed25519_scalarmult: Some(dalek_ed25519_scalarmult_keccak),
 };
 
 /// Donna driver implementation (keccak build via FFI)
@@ -26,7 +25,6 @@ const DONNA: Driver = Driver {
     curved25519_scalarmult_basepoint: ffi::curved25519_scalarmult_basepoint_keccak,
     curve25519_scalarmult: None,
     ed25519_scalarmult: Some(ffi::ed25519_scalarmult_keccak),
-    sign_open_batch: None,
 };
 
 

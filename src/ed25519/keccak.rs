@@ -1,14 +1,12 @@
 //! ed25519 API using `keccak512` signatures, equivalent to `ed25519-donna` APIs generated with a custom `keccak512` hasher (see [`tests/ed25519-keccak.c`](https://github.com/ryankurte/rust-trezor-crypto/blob/main/tests/ed25519-keccak.c))
 
 use super::{PublicKey, SecretKey, Signature};
-use crate::{Int, UInt, modm::expand256_modm};
+use crate::{Int, UInt};
 
 use curve25519_dalek::{
-    montgomery::MontgomeryPoint,
-    constants::{ED25519_BASEPOINT_TABLE, MINUS_ONE}, edwards::CompressedEdwardsY,
+    edwards::CompressedEdwardsY,
 };
 use sha3::{Digest, Keccak512};
-use subtle::ConditionallyNegatable;
 
 /// Derives a public key from a private key using keccak digest
 #[no_mangle]
@@ -45,7 +43,7 @@ pub extern "C" fn dalek_ed25519_sign_open_keccak(
 /// Scalar multiplication using the provided basepoint via Keccak derivation
 // TODO(@ryankurte): WIP in an attempt to assuage NEM tests
 #[no_mangle]
-pub extern "C" fn dalek_curve25519_scalarmult_keccak(
+pub extern "C" fn dalek_ed25519_scalarmult_keccak(
     o: *mut PublicKey,
     sk: *mut SecretKey,
     bp: *mut PublicKey,
@@ -65,7 +63,7 @@ pub extern "C" fn dalek_curve25519_scalarmult_keccak(
     buff[31] |=  64;
 
     // Construct scalar via keccak hash
-    let mut e = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(buff);
+    let e = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(buff);
 
     // Expand basepoint to ge25519 pt
     let bp = match CompressedEdwardsY(*bp).decompress() {
@@ -74,7 +72,7 @@ pub extern "C" fn dalek_curve25519_scalarmult_keccak(
     };
 
     // Compute `e * bp` (ie. x25519 DH)
-    let mut p = &e * &bp;
+    let p = &e * &bp;
 
     // Compress result point
     let u = p.compress();
@@ -124,7 +122,7 @@ mod tests {
 
             let mut p = PublicKey::default();
 
-            unsafe { dalek_ed25519_publickey_keccak(&mut pri_key, &mut p) };
+            dalek_ed25519_publickey_keccak(&mut pri_key, &mut p);
 
             assert_eq!(pub_key, p, "expected: {:02x?} actual: {:02x?}", pub_key, p);
         }

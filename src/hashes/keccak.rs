@@ -3,10 +3,7 @@
 
 use core::slice::{from_raw_parts};
 
-use crate::ffi;
-
 use sha3::{Digest, Keccak512};
-use static_assertions::const_assert_eq;
 
 /// C compatible keccak512 context
 #[repr(C)]
@@ -17,9 +14,10 @@ pub struct Keccak512Ctx {
 // Ensure C keccak object and rust keccak object sizes match
 // This is pretty gnarley, but, there doesn't seem to be a more
 // reasonable way of exposing -sized- rust types to C..?
+#[cfg(feature = "build_donna")]
 static_assertions::assert_eq_size!(
     Keccak512Ctx,
-    ffi::keccak512_ctx_t
+    crate::ffi::keccak512_ctx_t
 );
 
 #[no_mangle]

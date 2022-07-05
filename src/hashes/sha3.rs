@@ -3,10 +3,7 @@
 
 use core::slice::{from_raw_parts};
 
-use crate::ffi;
-
 use sha3::{Digest, Sha3_512};
-use static_assertions::const_assert_eq;
 
 /// C compatible sha3_512 context
 #[repr(C)]
@@ -17,9 +14,10 @@ pub struct Sha3_512Ctx {
 // Ensure C sha3_ object and rust sha3_ object sizes match
 // This is pretty gnarley, but, there doesn't seem to be a more
 // reasonable way of exposing -sized- rust types to C..?
+#[cfg(feature = "build_donna")]
 static_assertions::assert_eq_size!(
     Sha3_512Ctx,
-    ffi::sha3_512_ctx_t
+    crate::ffi::sha3_512_ctx_t
 );
 
 #[no_mangle]

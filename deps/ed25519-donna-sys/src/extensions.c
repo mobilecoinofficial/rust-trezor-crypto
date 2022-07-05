@@ -100,3 +100,111 @@ void curve25519_scalarmult(curved25519_key mypublic, const curved25519_key secre
 	memzero(&e, sizeof(e));
 #endif
 }
+
+static void
+ed25519_extsk(hash_512bits extsk, const ed25519_secret_key sk) {
+	ed25519_hash(extsk, sk, 32);
+	extsk[0] &= 248;
+	extsk[31] &= 127;
+	extsk[31] |= 64;
+}
+
+int ed25519_cosi_combine_publickeys(ed25519_public_key res, const ed25519_public_key *pks, size_t n) {
+	size_t i = 0;
+	ge25519 P = {0};
+	ge25519_pniels sump = {0};
+	ge25519_p1p1 sump1 = {0};
+
+	if (n == 1) {
+		memcpy(res, pks, sizeof(ed25519_public_key));
+		return 0;
+	}
+	if (!ge25519_unpack_negative_vartime(&P, pks[i++])) {
+		return -1;
+	}
+	ge25519_full_to_pniels(&sump, &P);
+	while (i < n - 1) {
+		if (!ge25519_unpack_negative_vartime(&P, pks[i++])) {
+			return -1;
+		}
+		ge25519_pnielsadd(&sump, &P, &sump);
+	}
+	if (!ge25519_unpack_negative_vartime(&P, pks[i++])) {
+		return -1;
+	}
+	ge25519_pnielsadd_p1p1(&sump1, &P, &sump, 0);
+	ge25519_p1p1_to_partial(&P, &sump1);
+	curve25519_neg(P.x, P.x);
+	ge25519_pack(res, &P);
+	return 0;
+}
+
+void ed25519_cosi_combine_signatures(ed25519_signature res, const ed25519_public_key R, const ed25519_signature *sigs, size_t n) {
+	bignum256modm s = {0}, t = {0};
+	size_t i = 0;
+
+	expand256_modm(s, sigs[i++], 32);
+	while (i < n) {
+		expand256_modm(t, sigs[i++], 32);
+		add256_modm(s, s, t);
+	}
+	memcpy(res, R, 32);
+	contract256_modm(res + 32, s);
+}
+
+void print_buff_u8(const char* prefix, const uint8_t* buff, size_t len) {
+	printf("%s: [", prefix);
+	for(int i=0; i<len; i++) {
+		printf("%02x%s", buff[i], i == (len - 1) ? "" : ", ");
+	}
+	printf("]\r\n");
+}
+
+void print_buff_u32(const char* prefix, const uint32_t* buff, size_t len) {
+	printf("%s: [", prefix);
+	for(int i=0; i<len; i++) {
+		printf("%08x%s", buff[i], i == (len - 1) ? "" : ", ");
+	}
+	printf("]\r\n");
+}
+
+void ed25519_cosi_sign (const unsigned char *m, size_t mlen, const ed25519_secret_key sk, const ed25519_secret_key nonce, const ed25519_public_key R, const ed25519_public_key pk, ed25519_signature sig) {
+	bignum256modm r = {0}, S = {0}, a = {0};
+	hash_512bits extsk = {0}, extnonce = {0}, hram = {0};
+
+	ed25519_extsk(extsk, sk);
+	ed25519_extsk(extnonce, nonce);
+
+	//print_buff_u8("DONNA EXTSK", extsk, 64);
+	//print_buff_u8("DONNA EXTNONCE", extnonce, 64);
+
+	/* r = nonce */
+	expand256_modm(r, extnonce, 32);
+	memzero(&extnonce, sizeof(extnonce));
+
+	print_buff_u32("DONNA R", r, 9);
+
+	/* S = H(R,A,m).. */
+	ed25519_hram(hram, R, pk, m, mlen);
+	expand256_modm(S, hram, 64);
+
+	print_buff_u32("DONNA S", S, 9);
+
+	//print_buff_u8("DONNA H", hram, 64);
+
+	/* S = H(R,A,m)a */
+	expand256_modm(a, extsk, 32);
+	memzero(&extsk, sizeof(extsk));
+
+	//print_buff_u32("DONNA SK", a, 9);
+
+	mul256_modm(S, S, a);
+	memzero(&a, sizeof(a));
+
+	/* S = (r + H(R,A,m)a) */
+	add256_modm(S, S, r);
+	memzero(&r, sizeof(r));
+
+	/* S = (r + H(R,A,m)a) mod L */
+	contract256_modm(sig, S);
+}

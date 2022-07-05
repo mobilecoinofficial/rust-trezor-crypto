@@ -34,7 +34,7 @@ mem_macros = "1.0.1"
 hex = { version = "0.4.3", optional = true }
 
 [dependencies.curve25519-dalek]
-version = "3.2.1"
+version = "3.2.0"
 features = [ "u32_backend", "yolo_crypto" ]
 default_features = false
 

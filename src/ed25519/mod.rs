@@ -6,7 +6,7 @@ use curve25519_dalek::{
     constants::ED25519_BASEPOINT_TABLE,
     digest::{consts::U64, Digest}, montgomery::MontgomeryPoint,
 };
-use ed25519_dalek::{Sha512, Signer, Verifier, ExpandedSecretKey};
+use ed25519_dalek::{Sha512, ExpandedSecretKey};
 
 use crate::{Int, UInt};
 
@@ -37,11 +37,14 @@ pub type Signature = [u8; SIGNATURE_LENGTH];
 /// Ed25519 Scalar, compatible with donna's `typedef unsigned char curved25519_key[32]`
 pub type Scalar = [u8; SCALAR_LENGTH];
 
+/// COSI specific signature type
+pub type CosiSignature = [u8; SCALAR_LENGTH];
 
 pub mod keccak;
 
 pub mod sha3;
 
+//pub mod cosi;
 
 /// Derives a public key from a private key (using the default `sha512` digest)
 ///
@@ -212,60 +215,6 @@ pub extern "C" fn dalek_ed25519_sign(
     ed25519_sign::<Sha512>(m, mlen, sk, pk, sig);
 }
 
-const MAX_BATCH_SIZE: usize = 16;
-
-/// Batch verify signatures, `valid[i] == 1` for valid, `valid[i] == 0` otherwise INCOMPLETE
-/// 
-// TODO(@ryankurte): `ed25519-donna-batchverify.h` has -a lot- going on, presumably for performance reasons (see `cargo bench`)...
-// seems like [`ed25519_dalek::verify_batch`] could substitute but we still need to return the *valid values per message (and run without `std` or `alloc`)
-// TODO(@ryankurte): reverse engineer the error returns from the existing code
-#[no_mangle]
-pub extern "C" fn dalek_ed25519_sign_open_batch(
-    m: *mut *const u8,
-    mlen: *mut UInt,
-    pk: *mut *const u8,
-    rs: *mut *const u8,
-    num: UInt,
-    valid: *mut Int,
-) -> Int {
-    use core::slice::{from_raw_parts};
-
-    // Convert pointers into slices
-    let (m, mlen, pk, rs, valid) = unsafe {
-        (
-            core::slice::from_raw_parts(m, num as usize),
-            core::slice::from_raw_parts(mlen, num as usize),
-            core::slice::from_raw_parts_mut(pk, num as usize),
-            core::slice::from_raw_parts_mut(rs, num as usize),
-            core::slice::from_raw_parts_mut(valid, num as usize),
-        )
-    };
-
-    let mut all_valid = 0;
-
-    // Set all messages to invalid
-    valid.iter_mut().for_each(|v| *v = 1);
-
-    // Check for signature validity
-    for i in 0..num as usize {
-        let v = dalek_ed25519_sign_open(
-            m[i],
-            mlen[i],
-            pk[i] as *mut PublicKey,
-            rs[i] as *mut Signature,
-        );
-        valid[i] = match v {
-            0 => 1,
-            _ => {
-                all_valid = 1;
-                0
-            }
-        };
-    }
-
-    all_valid
-}
-
 /// Generate random bytes using the system RNG
 // TODO(@ryankurte): possible we don't need this / appears primarily used for testing
 #[no_mangle]
@@ -303,6 +252,8 @@ pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut Scalar, e: *mu
     // Write back to pk
     pk.copy_from_slice(u.as_bytes());
 }
+
+
 
 /// Scalar multiplication using the provided basepoint
 #[no_mangle]
@@ -405,6 +356,8 @@ pub extern "C" fn dalek_ed25519_sign_ext(
     sig.copy_from_slice(signature.as_ref());
 }
 
+
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -425,13 +378,12 @@ mod test {
         hex::decode_to_slice(SCALARMULT_VECS.2, &mut sess).unwrap();
 
         let mut sess2 = [0u8; 32];
-        unsafe {
-            (dalek_curve25519_scalarmult)(
-                sess2.as_mut_ptr() as *mut Scalar,
-                sk.as_mut_ptr() as *mut SecretKey,
-                pk.as_mut_ptr() as *mut PublicKey,
-            )
-        };
+        
+        (dalek_curve25519_scalarmult)(
+            sess2.as_mut_ptr() as *mut Scalar,
+            sk.as_mut_ptr() as *mut SecretKey,
+            pk.as_mut_ptr() as *mut PublicKey,
+        );
 
         assert_eq!(&sess[..], &sess2[..])
     }

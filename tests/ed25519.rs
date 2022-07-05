@@ -1,11 +1,10 @@
 
-use ed25519_donna_sys;
+use {ed25519_donna_sys as _};
 
 use trezor_crypto_lib::{
-    UInt,
+    ed25519::{self, SecretKey, PublicKey, dalek_ed25519_publickey, dalek_ed25519_sign, dalek_ed25519_sign_open},
     ffi,
-    ed25519::{self, PublicKey, SecretKey, Signature, Scalar},
-    test::{self, Driver, ExtendedDriver, Batch},
+    test::{self, Driver, ExtendedDriver}, UInt,
 };
 
 /// Donna driver implementation (via FFI)
@@ -16,7 +15,6 @@ pub const DONNA: ExtendedDriver = ExtendedDriver {
         sign: ffi::ed25519_sign,
         curved25519_scalarmult_basepoint: ffi::curved25519_scalarmult_basepoint,
         curve25519_scalarmult: Some(ffi::curve25519_scalarmult),
-        sign_open_batch: Some(ffi::ed25519_sign_open_batch),
         ed25519_scalarmult: None,
     },
     publickey_ext: ffi::ed25519_publickey_ext,
@@ -31,7 +29,6 @@ pub const DALEK: ExtendedDriver = ExtendedDriver {
         sign: ed25519::dalek_ed25519_sign,
         curved25519_scalarmult_basepoint: ed25519::dalek_curved25519_scalarmult_basepoint,
         curve25519_scalarmult: Some(ed25519::dalek_curve25519_scalarmult),
-        sign_open_batch: Some(ed25519::dalek_ed25519_sign_open_batch),
         ed25519_scalarmult: None,
     },
     publickey_ext: ed25519::dalek_ed25519_publickey_ext,
@@ -66,30 +63,6 @@ fn dalek_sign_donna_verify() {
 #[test]
 fn scalarmult_basepoint() {
     test::scalarmult_basepoint(&DALEK, &DONNA);
-}
-
-
-// TODO: work out why donna fails with larger batch sizes
-const TEST_BATCH_SIZE: usize = 16;
-
-#[test]
-fn batch_verify_donna_donna() {
-    test::batch_verify::<TEST_BATCH_SIZE>(&DONNA, &DONNA);
-}
-
-#[test]
-fn batch_verify_dalek_dalek() {
-    test::batch_verify::<TEST_BATCH_SIZE>(&DALEK, &DALEK);
-}
-
-#[test]
-fn batch_verify_donna_dalek() {
-    test::batch_verify::<TEST_BATCH_SIZE>(&DONNA, &DALEK);
-}
-
-#[test]
-fn batch_verify_dalek_donna() {
-    test::batch_verify::<TEST_BATCH_SIZE>(&DALEK, &DONNA);
 }
 
 #[test]
