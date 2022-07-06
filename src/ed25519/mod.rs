@@ -3,7 +3,7 @@
 //! These functions are ABI compatible with those provided by `donna`, with the addition of a `dalek_` prefix to allow linking both implementations for testing.
 
 use curve25519_dalek::{
-    constants::ED25519_BASEPOINT_TABLE,
+    constants::ED25519_BASEPOINT_POINT,
     digest::{consts::U64, Digest}, montgomery::MontgomeryPoint,
 };
 use ed25519_dalek::{Sha512, ExpandedSecretKey};
@@ -243,7 +243,7 @@ pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut Scalar, e: *mu
     let s = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(ec);
 
     // scalar * basepoint
-    let p = &ED25519_BASEPOINT_TABLE * &s;
+    let p = &ED25519_BASEPOINT_POINT * &s;
 
     // convert to montgomery
     /* u = (y + z) / (z - y) */

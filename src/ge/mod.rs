@@ -8,7 +8,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use cty::{c_int, c_uchar, size_t};
 
 use curve25519_dalek::{
-    constants::{ED25519_BASEPOINT_TABLE},
+    constants::{ED25519_BASEPOINT_POINT},
     edwards::{CompressedEdwardsY, EdwardsPoint},
     scalar::Scalar,
     field::FieldElement,
@@ -131,7 +131,7 @@ pub unsafe extern "C" fn dalek_ge25519_double_scalarmult_vartime(
         Scalar::from_unpacked_u32(*s2),
     );
 
-    let r1 = s1 * p1 + &ED25519_BASEPOINT_TABLE * &s2;
+    let r1 = s1 * p1 + &ED25519_BASEPOINT_POINT * &s2;
 
     *r = Ge25519::from(&r1);
 }
@@ -430,7 +430,7 @@ pub unsafe extern "C" fn dalek_ge25519_scalarmult(
 pub unsafe extern "C" fn dalek_ge25519_scalarmult_base_wrapper(r: *mut Ge25519, s: *const Bignum256Modm) {
     let s1 = Scalar::from_unpacked_u32(*s);
 
-    let r1 = &ED25519_BASEPOINT_TABLE * &s1;
+    let r1 = &ED25519_BASEPOINT_POINT * &s1;
 
     *r = Ge25519::from(&r1);
 }
