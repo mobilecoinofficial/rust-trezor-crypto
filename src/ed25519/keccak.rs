@@ -10,7 +10,7 @@ use sha3::{Digest, Keccak512};
 
 /// Derives a public key from a private key using keccak digest
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_publickey_keccak(sk: *mut SecretKey, pk: *mut PublicKey) {
+pub extern "C" fn ed25519_publickey_keccak(sk: *mut SecretKey, pk: *mut PublicKey) {
     let (sk, pk) = unsafe { (&(*sk), &mut (*pk)) };
 
     super::ed25519_publickey_digest::<Keccak512>(sk, pk)
@@ -19,31 +19,31 @@ pub extern "C" fn dalek_ed25519_publickey_keccak(sk: *mut SecretKey, pk: *mut Pu
 
 /// Signs a message using the provided secret key using keccak digest (both for message and secret key expansion)
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_sign_keccak(
+pub extern "C" fn ed25519_sign_keccak(
     m: *const u8,
     mlen: UInt,
     sk: *mut SecretKey,
     pk: *mut PublicKey,
     sig: *mut Signature,
 ) {
-    super::ed25519_sign::<Keccak512>(m, mlen, sk, pk, sig)
+    super::ed25519_sign_internal::<Keccak512>(m, mlen, sk, pk, sig)
 }
 
 /// Verifies a message using the provided public key and signature using keccak digest
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_sign_open_keccak(
+pub extern "C" fn ed25519_sign_open_keccak(
     m: *const u8,
     mlen: UInt,
     pk: *mut PublicKey,
     sig: *mut Signature,
 ) -> Int {
-    super::ed25519_sign_open::<Keccak512>(m, mlen, pk, sig)
+    super::ed25519_sign_open_internal::<Keccak512>(m, mlen, pk, sig)
 }
 
 /// Scalar multiplication using the provided basepoint via Keccak derivation
 // TODO(@ryankurte): WIP in an attempt to assuage NEM tests
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_scalarmult_keccak(
+pub extern "C" fn ed25519_scalarmult_keccak(
     o: *mut PublicKey,
     sk: *mut SecretKey,
     bp: *mut PublicKey,
@@ -86,11 +86,11 @@ pub extern "C" fn dalek_ed25519_scalarmult_keccak(
 /// Scalar multiplication via Keccak derivation using the default basepoint
 // TODO(@ryankurte): WIP in an attempt to assuage NEM tests
 #[no_mangle]
-pub extern "C" fn dalek_curved25519_scalarmult_basepoint_keccak(
+pub extern "C" fn curved25519_scalarmult_basepoint_keccak(
     o: *mut PublicKey,
     s: *mut SecretKey,
 ) {
-    super::dalek_curved25519_scalarmult_basepoint(o, s);
+    super::curved25519_scalarmult_basepoint(o, s);
 }
 
 /// Integration tests (self contained)
@@ -122,7 +122,7 @@ mod tests {
 
             let mut p = PublicKey::default();
 
-            dalek_ed25519_publickey_keccak(&mut pri_key, &mut p);
+            ed25519_publickey_keccak(&mut pri_key, &mut p);
 
             assert_eq!(pub_key, p, "expected: {:02x?} actual: {:02x?}", pub_key, p);
         }

@@ -3,7 +3,7 @@
 //#include "ed25519-sha3_.h"
 //#include "ed25519-hash-custom-sha3_.h"
 
-#define ED25519_SUFFIX _sha3
+#define ED25519_SUFFIX _donna_sha3
 
 #include <stdlib.h>
 #include <stdint.h>

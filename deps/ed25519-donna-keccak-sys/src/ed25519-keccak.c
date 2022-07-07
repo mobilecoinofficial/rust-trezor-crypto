@@ -3,7 +3,7 @@
 //#include "ed25519-keccak.h"
 //#include "ed25519-hash-custom-keccak.h"
 
-#define ED25519_SUFFIX _keccak
+#define ED25519_SUFFIX _donna_keccak
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -49,7 +49,7 @@ static void ge25519_cmove_stride4b(long * r, long * p, long * pos, long * n, int
   r[3] = x3;
 }
 
-void ge25519_move_conditional_pniels_array(ge25519_pniels * r, const ge25519_pniels * p, int pos, int n) {
+static void ge25519_move_conditional_pniels_array(ge25519_pniels * r, const ge25519_pniels * p, int pos, int n) {
   size_t i = 0;
   for(i=0; i<sizeof(ge25519_pniels)/sizeof(long); i+=4) {
     ge25519_cmove_stride4b(((long*)r)+i,
@@ -61,7 +61,7 @@ void ge25519_move_conditional_pniels_array(ge25519_pniels * r, const ge25519_pni
 }
 
 /* computes [s1]p1, constant time */
-void ge25519_scalarmult(ge25519 *r, const ge25519 *p1, const bignum256modm s1) {
+void ge25519_scalarmult_donna_keccak(ge25519 *r, const ge25519 *p1, const bignum256modm s1) {
 	signed char slide1[64] = {0};
 	ge25519_pniels pre1[9] = {0};
 	ge25519_pniels pre = {0};
@@ -101,8 +101,7 @@ void ge25519_scalarmult(ge25519 *r, const ge25519 *p1, const bignum256modm s1) {
     memset(slide1, 0, sizeof(slide1));
 }
 
-int
-ED25519_FN(ed25519_scalarmult) (ed25519_public_key res, const ed25519_secret_key sk, const ed25519_public_key pk) {
+int ed25519_scalarmult_donna_keccak(ed25519_public_key res, const ed25519_secret_key sk, const ed25519_public_key pk) {
 	bignum256modm a = { 0 };
     bignum256modm zero = { 0 };
 	ge25519 ALIGN(16) A, P;
@@ -116,7 +115,7 @@ ED25519_FN(ed25519_scalarmult) (ed25519_public_key res, const ed25519_secret_key
 		return -1;
 	}
 
-	ge25519_scalarmult(&A, &P, a);
+	ge25519_scalarmult_donna_keccak(&A, &P, a);
 
 	memset(&a, 0, sizeof(a));
 	curve25519_neg(A.x, A.x);

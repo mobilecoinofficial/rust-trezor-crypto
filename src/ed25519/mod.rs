@@ -1,6 +1,6 @@
 //! Curve25519 operations over `sha512` (default), [`keccak`], and [`sha3`].
 //! 
-//! These functions are ABI compatible with those provided by `donna`, with the addition of a `dalek_` prefix to allow linking both implementations for testing.
+//! These functions are ABI compatible with those provided by `donna`
 
 use curve25519_dalek::{
     constants::ED25519_BASEPOINT_POINT,
@@ -50,7 +50,7 @@ pub mod cosi;
 ///
 /// Compatible with ed25519-donna [ed25519_publickey](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L45)
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_publickey(sk: *mut SecretKey, pk: *mut PublicKey) {
+pub extern "C" fn ed25519_publickey(sk: *mut SecretKey, pk: *mut PublicKey) {
     let (sk, pk) = unsafe { (&(*sk), &mut (*pk)) };
 
     // Parse out secret key
@@ -102,17 +102,17 @@ fn ed25519_publickey_digest<D: Digest<OutputSize = U64>>(sk: &SecretKey, pk: &mu
 ///
 /// Compatible with ed25519-donna [ed25519_sign_open](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L94)
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_sign_open(
+pub extern "C" fn ed25519_sign_open(
     m: *const u8,
     mlen: UInt,
     pk: *mut PublicKey,
     sig: *mut Signature,
 ) -> Int {
-    return ed25519_sign_open::<Sha512>(m, mlen, pk, sig);
+    return ed25519_sign_open_internal::<Sha512>(m, mlen, pk, sig);
 }
 
 /// Internal verify function, generic over digest types
-fn ed25519_sign_open<D: Digest<OutputSize = U64>>(
+fn ed25519_sign_open_internal<D: Digest<OutputSize = U64>>(
     m: *const u8,
     mlen: UInt,
     pk: *mut PublicKey,
@@ -150,7 +150,7 @@ fn ed25519_sign_open<D: Digest<OutputSize = U64>>(
 }
 
 /// Internal sign function, generic over digest types
-fn ed25519_sign<D: Digest<OutputSize = U64>>(
+fn ed25519_sign_internal<D: Digest<OutputSize = U64>>(
     m: *const u8,
     mlen: UInt,
     sk: *mut SecretKey,
@@ -205,20 +205,20 @@ fn ed25519_sign<D: Digest<OutputSize = U64>>(
 ///
 /// Compatible with ed25519-donna [ed25519_sign](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L59)
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_sign(
+pub extern "C" fn ed25519_sign(
     m: *const u8,
     mlen: UInt,
     sk: *mut SecretKey,
     pk: *mut PublicKey,
     sig: *mut Signature,
 ) {
-    ed25519_sign::<Sha512>(m, mlen, sk, pk, sig);
+    ed25519_sign_internal::<Sha512>(m, mlen, sk, pk, sig);
 }
 
 /// Generate random bytes using the system RNG
 // TODO(@ryankurte): possible we don't need this / appears primarily used for testing
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_randombytes_unsafe(out: *mut u8, count: UInt) {
+pub extern "C" fn ed25519_randombytes_unsafe(out: *mut u8, count: UInt) {
     let buff = unsafe { core::slice::from_raw_parts_mut(out, count as usize) };
     let _ = getrandom::getrandom(buff);
 }
@@ -227,7 +227,7 @@ pub extern "C" fn dalek_ed25519_randombytes_unsafe(out: *mut u8, count: UInt) {
 ///
 /// Compatible with ed25519-donna [curved25519_scalarmult_basepoint](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519.c#L125)
 #[no_mangle]
-pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut Scalar, e: *mut Scalar) {
+pub extern "C" fn curved25519_scalarmult_basepoint(pk: *mut Scalar, e: *mut Scalar) {
     let (pk, e) = unsafe { (&mut (*pk), &(*e)) };
 
     // Copy into editable slice
@@ -257,7 +257,7 @@ pub extern "C" fn dalek_curved25519_scalarmult_basepoint(pk: *mut Scalar, e: *mu
 
 /// Scalar multiplication using the provided basepoint
 #[no_mangle]
-pub extern "C" fn dalek_curve25519_scalarmult(
+pub extern "C" fn curve25519_scalarmult(
     o: *mut PublicKey,
     e: *mut SecretKey,
     bp: *mut PublicKey,
@@ -291,7 +291,7 @@ pub extern "C" fn dalek_curve25519_scalarmult(
 
 /// Generate a public key using the expanded (`sk + sk_ext`) form of the secret key
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_publickey_ext(
+pub extern "C" fn ed25519_publickey_ext(
     sk: *mut SecretKey,
     sk_ext: *mut SecretKey,
     pk: *mut PublicKey,
@@ -316,7 +316,7 @@ pub extern "C" fn dalek_ed25519_publickey_ext(
 
 /// Generate a signature using the expanded (`sk + sk_ext`) form of the secret key.
 #[no_mangle]
-pub extern "C" fn dalek_ed25519_sign_ext(
+pub extern "C" fn ed25519_sign_ext(
     m: *const u8,
     mlen: UInt,
     sk: *mut SecretKey,
@@ -379,7 +379,7 @@ mod test {
 
         let mut sess2 = [0u8; 32];
         
-        (dalek_curve25519_scalarmult)(
+        (curve25519_scalarmult)(
             sess2.as_mut_ptr() as *mut Scalar,
             sk.as_mut_ptr() as *mut SecretKey,
             pk.as_mut_ptr() as *mut PublicKey,

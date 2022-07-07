@@ -2,7 +2,7 @@
 use {ed25519_donna_sys as _};
 
 use trezor_crypto_lib::{
-    ed25519::{self, SecretKey, PublicKey, dalek_ed25519_publickey, dalek_ed25519_sign_open, cosi},
+    ed25519::{self, SecretKey, PublicKey, ed25519_publickey, ed25519_sign_open, cosi},
     ffi,
     test::{self, Driver, ExtendedDriver}, UInt,
 };
@@ -32,16 +32,16 @@ fn cosi_combine_publickeys<const N: usize>() {
     // Generate public keys
     let mut pks = [[0u8; 32]; N];
     for i in 0..N {
-        dalek_ed25519_publickey(&mut sks[i], &mut pks[i]);
+        ed25519_publickey(&mut sks[i], &mut pks[i]);
     }
 
     // Perform dalek cosi operation
     let mut a_pk = [0u8; 32];
-    unsafe { cosi::dalek_ed25519_cosi_combine_publickeys(&mut a_pk, pks.as_ptr(), N as UInt) };
+    unsafe { cosi::ed25519_cosi_combine_publickeys(&mut a_pk, pks.as_ptr(), N as UInt) };
 
     // Perform donna cosi operation
     let mut b_pk = [0u8; 32];
-    unsafe { ffi::ed25519_cosi_combine_publickeys(&mut b_pk, pks.as_ptr(), N as UInt) };
+    unsafe { ffi::ed25519_cosi_combine_publickeys_donna(&mut b_pk, pks.as_ptr(), N as UInt) };
 
     // Check outputs match
     assert_eq!(a_pk, b_pk);

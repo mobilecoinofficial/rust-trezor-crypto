@@ -10,13 +10,12 @@ fn main() -> anyhow::Result<()> {
 
     // Compile ed25519-donna w/ reference hash
     cc::Build::new()
-    .include("../../vendor/ed25519-donna")
-    .file("../../vendor/ed25519-donna/ed25519.c")
-    .file("src/extensions.c")
-    .define("ED25519_REFHASH", "1")
-    .define("ED25519_TEST", "1")
-    .warnings(false)
-    .compile("libed25519_donna.a");
+        .include("../../vendor/ed25519-donna")
+        .file("src/ed25519-base.c")
+        .define("ED25519_REFHASH", "1")
+        .define("ED25519_TEST", "1")
+        .warnings(false)
+        .compile("libed25519_donna.a");
 
     Ok(())
 }

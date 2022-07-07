@@ -2,7 +2,7 @@
 use {ed25519_donna_sys as _};
 
 use trezor_crypto_lib::{
-    ed25519::{self, SecretKey, PublicKey, dalek_ed25519_publickey, dalek_ed25519_sign, dalek_ed25519_sign_open},
+    ed25519::{self, SecretKey, PublicKey},
     ffi,
     test::{self, Driver, ExtendedDriver}, UInt,
 };
@@ -10,29 +10,29 @@ use trezor_crypto_lib::{
 /// Donna driver implementation (via FFI)
 pub const DONNA: ExtendedDriver = ExtendedDriver {
     driver: Driver{
-        publickey: ffi::ed25519_publickey,
-        sign_open: ffi::ed25519_sign_open,
-        sign: ffi::ed25519_sign,
-        curved25519_scalarmult_basepoint: ffi::curved25519_scalarmult_basepoint,
-        curve25519_scalarmult: Some(ffi::curve25519_scalarmult),
+        publickey: ffi::ed25519_publickey_donna,
+        sign_open: ffi::ed25519_sign_open_donna,
+        sign: ffi::ed25519_sign_donna,
+        curved25519_scalarmult_basepoint: ffi::curved25519_scalarmult_basepoint_donna,
+        curve25519_scalarmult: Some(ffi::curve25519_scalarmult_donna),
         ed25519_scalarmult: None,
     },
-    publickey_ext: ffi::ed25519_publickey_ext,
-    sign_ext: ffi::ed25519_sign_ext,
+    publickey_ext: ffi::ed25519_publickey_ext_donna,
+    sign_ext: ffi::ed25519_sign_ext_donna,
 };
 
 /// Dalek driver implementation (native rust)
 pub const DALEK: ExtendedDriver = ExtendedDriver {
     driver: Driver{
-        publickey: ed25519::dalek_ed25519_publickey,
-        sign_open: ed25519::dalek_ed25519_sign_open,
-        sign: ed25519::dalek_ed25519_sign,
-        curved25519_scalarmult_basepoint: ed25519::dalek_curved25519_scalarmult_basepoint,
-        curve25519_scalarmult: Some(ed25519::dalek_curve25519_scalarmult),
+        publickey: ed25519::ed25519_publickey,
+        sign_open: ed25519::ed25519_sign_open,
+        sign: ed25519::ed25519_sign,
+        curved25519_scalarmult_basepoint: ed25519::curved25519_scalarmult_basepoint,
+        curve25519_scalarmult: Some(ed25519::curve25519_scalarmult),
         ed25519_scalarmult: None,
     },
-    publickey_ext: ed25519::dalek_ed25519_publickey_ext,
-    sign_ext: ed25519::dalek_ed25519_sign_ext,
+    publickey_ext: ed25519::ed25519_publickey_ext,
+    sign_ext: ed25519::ed25519_sign_ext,
 };
 
 #[test]

@@ -57,13 +57,13 @@ impl Default for Ge25519 {
 
 /// TODO
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_set_neutral(r: *mut Ge25519) {
+pub unsafe extern "C" fn ge25519_set_neutral(r: *mut Ge25519) {
     (*r) = Ge25519::from(&EdwardsPoint::identity());
 }
 
 /// Point addition, `r = a + b` if signbit == 0, `r = a - b` if signbit == 1
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_add(
+pub unsafe extern "C" fn ge25519_add(
     r: *mut Ge25519,
     a: *const Ge25519,
     b: *const Ge25519,
@@ -89,7 +89,7 @@ pub unsafe extern "C" fn dalek_ge25519_add(
 
 /// Point doubling, `r = 2 * p`
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_double(r: *mut Ge25519, p: *const Ge25519) {
+pub unsafe extern "C" fn ge25519_double(r: *mut Ge25519, p: *const Ge25519) {
     let p1 = match EdwardsPoint::try_from(&*p) {
         Ok(v) => v,
         Err(_) => return,
@@ -102,7 +102,7 @@ pub unsafe extern "C" fn dalek_ge25519_double(r: *mut Ge25519, p: *const Ge25519
 
 /// Multiply by cofactor, `r = [8]P`
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_mul8(r: *mut Ge25519, p: *const Ge25519) {
+pub unsafe extern "C" fn ge25519_mul8(r: *mut Ge25519, p: *const Ge25519) {
     let p1 = match EdwardsPoint::try_from(&*p) {
         Ok(v) => v,
         Err(_) => return,
@@ -115,7 +115,7 @@ pub unsafe extern "C" fn dalek_ge25519_mul8(r: *mut Ge25519, p: *const Ge25519) 
 
 /// Point/Scalar multiplication, `r = [s1]p1 + [s2]base`
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_double_scalarmult_vartime(
+pub unsafe extern "C" fn ge25519_double_scalarmult_vartime(
     r: *mut Ge25519,
     p1: *const Ge25519,
     s1: *const Bignum256Modm,
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn dalek_ge25519_double_scalarmult_vartime(
 
 /// Point/Scalar multiplication, `r = [s1]p1 + [s2]p2`
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_double_scalarmult_vartime2(
+pub unsafe extern "C" fn ge25519_double_scalarmult_vartime2(
     r: *mut Ge25519,
     p1: *const Ge25519,
     s1: *const Bignum256Modm,
@@ -166,7 +166,7 @@ pub unsafe extern "C" fn dalek_ge25519_double_scalarmult_vartime2(
 
 /// Convert point `p1` ([`Ge25519`]) to compressed form `r` (`[u8; 32]`)
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_pack(r: *mut [u8; 32], p1: *const Ge25519) {
+pub unsafe extern "C" fn ge25519_pack(r: *mut [u8; 32], p1: *const Ge25519) {
     let p1 = match EdwardsPoint::try_from(&*p1) {
         Ok(v) => v,
         Err(_) => return,
@@ -179,7 +179,7 @@ pub unsafe extern "C" fn dalek_ge25519_pack(r: *mut [u8; 32], p1: *const Ge25519
 
 /// Unpack compressed curve form `c` (`[u8; 32]`) to `r` ([`Ge25519`])
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_unpack_vartime(r: *mut Ge25519, c: *const [u8; 32]) -> c_int {
+pub unsafe extern "C" fn ge25519_unpack_vartime(r: *mut Ge25519, c: *const [u8; 32]) -> c_int {
     let c1 = CompressedEdwardsY(*c);
 
     let r1 = match c1.decompress() {
@@ -194,7 +194,7 @@ pub unsafe extern "C" fn dalek_ge25519_unpack_vartime(r: *mut Ge25519, c: *const
 
 ///Point copy, `r = p`
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_copy(r: *mut Ge25519, p: *const Ge25519) {
+pub unsafe extern "C" fn ge25519_copy(r: *mut Ge25519, p: *const Ge25519) {
     (*r).x = (*p).x;
     (*r).y = (*p).y;
     (*r).z = (*p).z;
@@ -205,7 +205,7 @@ const REDUCE_MASK_25: u32 = (1 << 25) - 1;
 const REDUCE_MASK_26: u32 = (1 << 26) - 1;
 
 /// Re-implementation of curve25519_expand_reduce from trezor's donna port
-unsafe fn dalek_curve25519_expand_reduce(hash: &[u8; 32]) -> FieldElement {
+unsafe fn curve25519_expand_reduce(hash: &[u8; 32]) -> FieldElement {
     let mut x = [0u32; 8];
 
     // Load in words
@@ -236,13 +236,13 @@ unsafe fn dalek_curve25519_expand_reduce(hash: &[u8; 32]) -> FieldElement {
 ///
 // TODO: incomplete / broken
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_fromfe_frombytes_vartime(
+pub unsafe extern "C" fn ge25519_fromfe_frombytes_vartime(
     r: *mut Ge25519,
     p: *const [u8; 32],
 ) {
 
     // Zmod(2^255-19) from byte array to bignum25519 ([u32; 10]) expansion with modular reduction
-    let mut u = dalek_curve25519_expand_reduce(&*p);
+    let mut u = curve25519_expand_reduce(&*p);
     if *p != u.to_bytes() {
         // TODO: canonicalisation doesn't -seem- to change anything
         u = FieldElement::from_bytes(&u.to_bytes());
@@ -408,7 +408,7 @@ fn fe_divpowm1(u: &FieldElement, v: &FieldElement) -> FieldElement {
 
 /// Point scalar multiplication, `r = [s1]p1`, constant time
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_scalarmult(
+pub unsafe extern "C" fn ge25519_scalarmult(
     r: *mut Ge25519,
     p1: *const Ge25519,
     s1: *const Bignum256Modm,
@@ -427,7 +427,7 @@ pub unsafe extern "C" fn dalek_ge25519_scalarmult(
 
 /// Compute point from scalar via niels_basepoint, `r = s * B`
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_scalarmult_base_wrapper(r: *mut Ge25519, s: *const Bignum256Modm) {
+pub unsafe extern "C" fn ge25519_scalarmult_base_wrapper(r: *mut Ge25519, s: *const Bignum256Modm) {
     let s1 = Scalar::from_unpacked_u32(*s);
 
     let r1 = &ED25519_BASEPOINT_POINT * &s1;
@@ -438,7 +438,7 @@ pub unsafe extern "C" fn dalek_ge25519_scalarmult_base_wrapper(r: *mut Ge25519, 
 /// Check if point `p1` is on a curve
 // TODO: better description..?
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_check(p1: *const Ge25519) -> c_int {
+pub unsafe extern "C" fn ge25519_check(p1: *const Ge25519) -> c_int {
     let p1 = match EdwardsPoint::try_from(&*p1) {
         Ok(v) => v,
         Err(_) => return 0,
@@ -455,7 +455,7 @@ pub unsafe extern "C" fn dalek_ge25519_check(p1: *const Ge25519) -> c_int {
 
 /// Point comparison, returns 1 if points are equal, 0 otherwise
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ge25519_eq(a: *const Ge25519, b: *const Ge25519) -> c_int {
+pub unsafe extern "C" fn ge25519_eq(a: *const Ge25519, b: *const Ge25519) -> c_int {
     let (p1, p2) = match (EdwardsPoint::try_from(&*a), EdwardsPoint::try_from(&*b)) {
         (Ok(p1), Ok(p2)) => (p1, p2),
         _ => return 0,
@@ -472,7 +472,7 @@ pub unsafe extern "C" fn dalek_ge25519_eq(a: *const Ge25519, b: *const Ge25519) 
 /// See [ed25519-donna.h:L67](https://github.com/floodyberry/ed25519-donna/blob/master/ed25519-donna.h#L67)
 /// TODO: why is this called `_verify` instead of something wild like, `_compare`..?
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ed25519_verify(
+pub unsafe extern "C" fn ed25519_verify(
     x: *const c_uchar,
     y: *const c_uchar,
     len: size_t,
@@ -533,11 +533,11 @@ mod test {
 
             // Decode packed point
             let mut decoded = Ge25519::default();
-            unsafe { dalek_ge25519_unpack_vartime(&mut decoded, &point) };
+            unsafe { ge25519_unpack_vartime(&mut decoded, &point) };
 
             // Re-encode packed point
             let mut encoded = [0u8; 32];
-            unsafe { dalek_ge25519_pack(&mut encoded, &decoded) };
+            unsafe { ge25519_pack(&mut encoded, &decoded) };
 
             assert_eq!(point, encoded);
         }
@@ -567,23 +567,23 @@ mod test {
 
             // Perform scalar multiplication
             let mut res = Ge25519::default();
-            unsafe { dalek_ge25519_scalarmult_base_wrapper(&mut res, &scalar) };
+            unsafe { ge25519_scalarmult_base_wrapper(&mut res, &scalar) };
 
             println!("Result: {:02x?}", res);
 
             // Pack result and check
             let mut compressed_res = [0u8; 32];
-            unsafe { dalek_ge25519_pack(&mut compressed_res, &res) };
+            unsafe { ge25519_pack(&mut compressed_res, &res) };
             assert_eq!(compressed_res, exp);
 
             println!("Compressed: {:02x?}", compressed_res);
 
             // Unpack exponent and check
             let mut unpacked_exp = Ge25519::default();
-            unsafe { dalek_ge25519_unpack_vartime(&mut unpacked_exp, &exp) };
+            unsafe { ge25519_unpack_vartime(&mut unpacked_exp, &exp) };
 
             // Compare unpacked points
-            let eq = unsafe { dalek_ge25519_eq(&res, &unpacked_exp) };
+            let eq = unsafe { ge25519_eq(&res, &unpacked_exp) };
             assert_eq!(eq, 1);
         }
     }
@@ -604,11 +604,11 @@ mod test {
 
             // Perform multiplication
             let mut res = Ge25519::default();
-            unsafe { dalek_ge25519_scalarmult(&mut res, &public, &private) };
+            unsafe { ge25519_scalarmult(&mut res, &public, &private) };
 
             // Pack result point
             let mut compressed_res = [0u8; 32];
-            unsafe { dalek_ge25519_pack(&mut compressed_res, &res) };
+            unsafe { ge25519_pack(&mut compressed_res, &res) };
 
             assert_eq!(compressed_res, exp);
         }
@@ -673,11 +673,11 @@ mod test {
 
             // Compute point from hash
             let mut res = Ge25519::default();
-            unsafe { dalek_ge25519_fromfe_frombytes_vartime(&mut res, &h) };
+            unsafe { ge25519_fromfe_frombytes_vartime(&mut res, &h) };
 
             // Pack result point
             let mut compressed_res = [0u8; 32];
-            unsafe { dalek_ge25519_pack(&mut compressed_res, &res) };
+            unsafe { ge25519_pack(&mut compressed_res, &res) };
 
             println!("result: {}", hex::encode(compressed_res));
 
@@ -716,7 +716,7 @@ mod test {
 
             let i = decode_bytes::<32>(_i);
 
-            let r = unsafe { dalek_curve25519_expand_reduce(&i) };
+            let r = unsafe { curve25519_expand_reduce(&i) };
 
             let result_hex = hex::encode(r.to_bytes());
 

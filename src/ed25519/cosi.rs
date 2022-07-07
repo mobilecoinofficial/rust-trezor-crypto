@@ -11,7 +11,7 @@ use super::{PublicKey, SecretKey, Signature, CosiSignature};
 
 /// Combine public keys via COSI
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ed25519_cosi_combine_publickeys(
+pub unsafe extern "C" fn ed25519_cosi_combine_publickeys(
     o: *mut PublicKey,
     pks: *const PublicKey,
     n: UInt) -> Int {
@@ -48,7 +48,7 @@ pub unsafe extern "C" fn dalek_ed25519_cosi_combine_publickeys(
 /// Combine signatures via COSI
 #[cfg(feature = "incomplete")]
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ed25519_cosi_combine_signatures(
+pub unsafe extern "C" fn ed25519_cosi_combine_signatures(
     o: *mut Signature,
     r: *const PublicKey,
     sigs: *const CosiSignature,
@@ -78,7 +78,7 @@ pub unsafe extern "C" fn dalek_ed25519_cosi_combine_signatures(
 /// Sign via COSI
 #[cfg(feature = "incomplete")]
 #[no_mangle]
-pub unsafe extern "C" fn dalek_ed25519_cosi_sign(
+pub unsafe extern "C" fn ed25519_cosi_sign(
     m: *const u8,
     mlen: UInt,
     sk: *const SecretKey,
