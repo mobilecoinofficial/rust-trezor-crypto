@@ -34,6 +34,12 @@ void ed25519_publickey_ext_donna(const ed25519_secret_key sk, const ed25519_secr
 	ge25519_pack(pk, &A);
 }
 
+void ed25519_sign2_donna(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, ed25519_signature sig) {
+	ed25519_public_key pk = { 0 };
+	ed25519_publickey_donna(sk, pk);
+	ed25519_sign_donna(m, mlen, sk, pk, sig);
+}
+
 void ed25519_sign_ext_donna(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, const ed25519_secret_key skext, const ed25519_public_key pk, ed25519_signature RS) {
 	ed25519_hash_context ctx;
 	bignum256modm r = {0}, S = {0}, a = {0};

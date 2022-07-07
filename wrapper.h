@@ -10,12 +10,14 @@ typedef unsigned char curved25519_key[32];
 
 typedef unsigned char ed25519_cosi_signature[32];
 
-// Default donna functions
+// Default (Sha512) donna functions
+
 void ed25519_publickey_donna(const ed25519_secret_key sk, ed25519_public_key pk);
 
 int ed25519_sign_open_donna(const unsigned char *m, size_t mlen, const ed25519_public_key pk, const ed25519_signature RS);
 
-void ed25519_sign_donna(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, const ed25519_public_key pk, ed25519_signature RS);
+void ed25519_sign2_donna(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, ed25519_signature RS);
+
 
 int ed25519_sign_open_batch_donna(const unsigned char **m, size_t *mlen, const unsigned char **pk, const unsigned char **RS, size_t num, int *valid);
 
@@ -26,7 +28,7 @@ void curved25519_scalarmult_basepoint_donna(ed25519_public_key res, const ed2551
 
 void ed25519_publickey_ext_donna(const ed25519_secret_key sk, const ed25519_secret_key skext, ed25519_public_key pk);
 
-void ed25519_sign_ext_donna(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, const ed25519_secret_key skext, const ed25519_public_key pk, ed25519_signature RS);
+void ed25519_sign_ext_donna(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, const ed25519_secret_key skext, ed25519_signature RS);
 
 /// Scalar multiplication with the provided basepoint
 void curve25519_scalarmult_donna(curved25519_key mypublic, const curved25519_key secret, const curved25519_key basepoint);
@@ -39,11 +41,12 @@ void ed25519_cosi_sign_donna(const unsigned char *m, size_t mlen, const ed25519_
 
 
 // Keccak donna impl
+
 void ed25519_publickey_donna_keccak(const ed25519_secret_key sk, ed25519_public_key pk);
 
 int ed25519_sign_open_donna_keccak(const unsigned char *m, size_t mlen, const ed25519_public_key pk, const ed25519_signature RS);
 
-void ed25519_sign_donna_keccak(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, const ed25519_public_key pk, ed25519_signature RS);
+void ed25519_sign2_donna_keccak(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, ed25519_signature RS);
 
 int ed25519_scalarmult_donna_keccak(ed25519_public_key res, const ed25519_secret_key sk, const ed25519_public_key pk);
 
@@ -51,11 +54,12 @@ void curved25519_scalarmult_basepoint_donna_keccak(ed25519_public_key res, const
 
 
 // Sha3 donna impl
+
 void ed25519_publickey_donna_sha3(const ed25519_secret_key sk, ed25519_public_key pk);
 
 int ed25519_sign_open_donna_sha3(const unsigned char *m, size_t mlen, const ed25519_public_key pk, const ed25519_signature RS);
 
-void ed25519_sign_donna_sha3(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, const ed25519_public_key pk, ed25519_signature RS);
+void ed25519_sign2_donna_sha3(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, ed25519_signature RS);
 
 int ed25519_scalarmult_donna_sha3(ed25519_public_key res, const ed25519_secret_key sk, const ed25519_public_key pk);
 

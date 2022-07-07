@@ -23,10 +23,9 @@ pub extern "C" fn ed25519_sign_keccak(
     m: *const u8,
     mlen: UInt,
     sk: *mut SecretKey,
-    pk: *mut PublicKey,
     sig: *mut Signature,
 ) {
-    super::ed25519_sign_internal::<Keccak512>(m, mlen, sk, pk, sig)
+    super::ed25519_sign_internal::<Keccak512>(m, mlen, sk, sig)
 }
 
 /// Verifies a message using the provided public key and signature using keccak digest

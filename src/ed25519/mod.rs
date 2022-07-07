@@ -154,23 +154,22 @@ fn ed25519_sign_internal<D: Digest<OutputSize = U64>>(
     m: *const u8,
     mlen: UInt,
     sk: *mut SecretKey,
-    pk: *mut PublicKey,
     sig: *mut Signature,
 ) {
     // Convert pointers into slices
-    let (m, sk, pk, sig) = unsafe {
+    let (m, sk, sig) = unsafe {
         (
             core::slice::from_raw_parts(m, mlen as usize),
             &(*sk),
-            &(*pk),
             &mut (*sig),
         )
     };
 
-    let public_key = match ed25519_dalek::PublicKey::from_bytes(pk) {
+    let secret_key = match ed25519_dalek::SecretKey::from_bytes(sk) {
         Ok(v) => v,
         Err(_e) => return,
     };
+
 
     // Expand secret key using provided digest
     let mut h = D::new();
@@ -189,6 +188,9 @@ fn ed25519_sign_internal<D: Digest<OutputSize = U64>>(
         Ok(v) => v,
         Err(_e) => return,
     };
+
+    // Generate matching public key
+    let public_key = ed25519_dalek::PublicKey::from(&secret_key);
 
     // Generate message hash for signing
     let mut d = D::new();
@@ -209,10 +211,9 @@ pub extern "C" fn ed25519_sign(
     m: *const u8,
     mlen: UInt,
     sk: *mut SecretKey,
-    pk: *mut PublicKey,
     sig: *mut Signature,
 ) {
-    ed25519_sign_internal::<Sha512>(m, mlen, sk, pk, sig);
+    ed25519_sign_internal::<Sha512>(m, mlen, sk, sig);
 }
 
 /// Generate random bytes using the system RNG
@@ -321,15 +322,13 @@ pub extern "C" fn ed25519_sign_ext(
     mlen: UInt,
     sk: *mut SecretKey,
     sk_ext: *mut SecretKey,
-    pk: *mut PublicKey,
     sig: *mut Signature,
 ) {
-    let (m, sk, sk_ext, pk, sig) = unsafe {
+    let (m, sk, sk_ext, sig) = unsafe {
         (
             core::slice::from_raw_parts(m, mlen as usize),
             &(*sk),
             &(*sk_ext),
-            &(*pk),
             &mut (*sig),
         )
     };
@@ -344,10 +343,7 @@ pub extern "C" fn ed25519_sign_ext(
         Err(_e) => return,
     };
 
-    let public_key = match ed25519_dalek::PublicKey::from_bytes(pk) {
-        Ok(v) => v,
-        Err(_e) => return,
-    };
+    let public_key = ed25519_dalek::PublicKey::from(&secret_key);
 
     // Generate signature
     let signature = secret_key.sign(m, &public_key);

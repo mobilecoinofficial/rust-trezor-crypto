@@ -18,10 +18,9 @@ pub extern "C" fn ed25519_sign_sha3(
     m: *const u8,
     mlen: UInt,
     sk: *mut SecretKey,
-    pk: *mut PublicKey,
     sig: *mut Signature,
 ) {
-    super::ed25519_sign_internal::<Sha3_512>(m, mlen, sk, pk, sig)
+    super::ed25519_sign_internal::<Sha3_512>(m, mlen, sk, sig)
 }
 
 /// Verifies a message using the provided secret key using sha3 digest

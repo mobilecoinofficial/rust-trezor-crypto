@@ -12,7 +12,7 @@ pub const DONNA: ExtendedDriver = ExtendedDriver {
     driver: Driver{
         publickey: ffi::ed25519_publickey_donna,
         sign_open: ffi::ed25519_sign_open_donna,
-        sign: ffi::ed25519_sign_donna,
+        sign: ffi::ed25519_sign2_donna,
         curved25519_scalarmult_basepoint: ffi::curved25519_scalarmult_basepoint_donna,
         curve25519_scalarmult: Some(ffi::curve25519_scalarmult_donna),
         ed25519_scalarmult: None,

@@ -30,6 +30,13 @@ void keccak512_hash(const unsigned char *in, size_t inlen, char* hash);
 
 #include "ed25519.c"
 
+// Replacement fn to avoid errors from passing `pk` and `sk`
+void ed25519_sign2_donna_keccak(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, ed25519_signature sig) {
+	ed25519_public_key pk = { 0 };
+	ed25519_publickey_donna_keccak(sk, pk);
+	ed25519_sign_donna_keccak(m, mlen, sk, pk, sig);
+}
+
 static void ge25519_cmove_stride4b(long * r, long * p, long * pos, long * n, int stride) {
   long x0=p[0], x1=p[1], x2=p[2], x3=p[3], y0 = 0, y1 = 0, y2 = 0, y3 = 0;
   for(p+=stride; p<n; p+=stride) {

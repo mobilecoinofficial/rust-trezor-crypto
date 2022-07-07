@@ -29,4 +29,11 @@ void sha3_512_hash(const unsigned char *in, size_t inlen, char* hash);
 
 #include "ed25519.c"
 
+// Replacement fn to avoid errors from passing `pk` and `sk`
+void ed25519_sign2_donna_sha3(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, ed25519_signature sig) {
+	ed25519_public_key pk = { 0 };
+	ed25519_publickey_donna_sha3(sk, pk);
+	ed25519_sign_donna_sha3(m, mlen, sk, pk, sig);
+}
+
 #undef ED25519_SUFFIX

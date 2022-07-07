@@ -14,7 +14,7 @@ pub struct Driver {
     
     /// Sign the provided message using the secret and public keys
     pub sign:
-        unsafe extern "C" fn(*const u8, UInt, *mut SecretKey, *mut PublicKey, *mut Signature),
+        unsafe extern "C" fn(*const u8, UInt, *mut SecretKey, *mut Signature),
     
     /// Verify the provided message using the public key and signature
     pub sign_open:
@@ -42,7 +42,6 @@ pub struct ExtendedDriver {
         mlen: UInt,
         sk: *mut SecretKey,
         sk_ext: *mut SecretKey,
-        pk: *mut PublicKey,
         sig: *mut Signature,
     ),
 }
@@ -127,7 +126,6 @@ pub fn sign_verify(signer: &Driver, verifier: &Driver) {
             m.as_ptr(),
             m.len() as UInt,
             sk.as_mut_ptr() as *mut SecretKey,
-            pk.as_mut_ptr() as *mut PublicKey,
             sig.as_mut_ptr() as *mut Signature,
         )
     };
@@ -365,7 +363,6 @@ pub fn sign_ext(signer: &ExtendedDriver, verifier: &ExtendedDriver) {
             m.len() as UInt,
             sk_base.as_mut_ptr() as *mut SecretKey,
             sk_ext.as_mut_ptr() as *mut SecretKey,
-            pk.as_mut_ptr() as *mut PublicKey,
             sig.as_mut_ptr() as *mut Signature,
         )
     }
