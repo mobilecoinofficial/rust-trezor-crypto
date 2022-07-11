@@ -67,7 +67,7 @@ ed25519-donna-sha3-sys = { path = "./deps/ed25519-donna-sha3-sys" }
 # See https://github.com/ryankurte/curve25519-dalek/pull/1
 
 #curve25519-dalek = { path = "../curve25519-dalek" }
-curve25519-dalek = { git = "https://github.com/ryankurte/curve25519-dalek", branch="point-construction-hacks" }
+curve25519-dalek = { git = "https://github.com/ryankurte/curve25519-dalek", branch="feature/ffi-raw-conversions" }
 
 # See https://github.com/dalek-cryptography/ed25519-dalek/pull/201
 

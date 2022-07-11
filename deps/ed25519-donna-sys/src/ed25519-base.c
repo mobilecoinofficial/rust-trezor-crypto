@@ -18,17 +18,13 @@ static void memzero(void* target, size_t len) {
     }
 }
 
-void ed25519_publickey_ext_donna(const ed25519_secret_key sk, const ed25519_secret_key skext, ed25519_public_key pk) {
+void ed25519_publickey_ext_donna(const ed25519_secret_key sk, ed25519_public_key pk) {
 	bignum256modm a = {0};
-	ge25519 ALIGN(16) A;
-	hash_512bits extsk = {0};
+	ge25519 ALIGN(16) A = {0};
 
-	/* we don't stretch the key through hashing first since its already 64 bytes */
+	expand256_modm(a, sk, 32);
 
-	memcpy(extsk, sk, 32);
-	memcpy(extsk+32, skext, 32);
-	expand256_modm(a, extsk, 32);
-	memzero(&extsk, sizeof(extsk));
+	/* A = aB */
 	ge25519_scalarmult_base_niels(&A, ge25519_niels_base_multiples, a);
 	memzero(&a, sizeof(a));
 	ge25519_pack(pk, &A);

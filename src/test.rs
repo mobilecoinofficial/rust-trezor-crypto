@@ -35,7 +35,7 @@ pub struct ExtendedDriver {
     pub driver: Driver,
 
     pub publickey_ext:
-    unsafe extern "C" fn(sk: *mut SecretKey, sk_ext: *mut SecretKey, pk: *mut PublicKey),
+    unsafe extern "C" fn(sk: *mut SecretKey, pk: *mut PublicKey),
 
     pub sign_ext: unsafe extern "C" fn(
         m: *const u8,
@@ -305,7 +305,6 @@ pub fn publickey_ext(a: &ExtendedDriver, b: &ExtendedDriver) {
     unsafe {
         (a.publickey_ext)(
             sk_base.as_mut_ptr() as *mut SecretKey,
-            sk_ext.as_mut_ptr() as *mut SecretKey,
             a_pk.as_mut_ptr() as *mut PublicKey,
         )
     };
@@ -316,7 +315,6 @@ pub fn publickey_ext(a: &ExtendedDriver, b: &ExtendedDriver) {
     unsafe {
         (b.publickey_ext)(
             sk_base.as_mut_ptr() as *mut SecretKey,
-            sk_ext.as_mut_ptr() as *mut SecretKey,
             b_pk.as_mut_ptr() as *mut PublicKey,
         )
     };
@@ -350,7 +348,6 @@ pub fn sign_ext(signer: &ExtendedDriver, verifier: &ExtendedDriver) {
     unsafe {
         (signer.publickey_ext)(
             sk_base.as_mut_ptr() as *mut SecretKey,
-            sk_ext.as_mut_ptr() as *mut SecretKey,
             pk.as_mut_ptr() as *mut PublicKey,
         )
     };

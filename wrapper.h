@@ -26,9 +26,12 @@ void curved25519_scalarmult_basepoint_donna(ed25519_public_key res, const ed2551
 
 // Extensions, ported from trezor donna
 
-void ed25519_publickey_ext_donna(const ed25519_secret_key sk, const ed25519_secret_key skext, ed25519_public_key pk);
+/// Generate public key for extended use from (non-extended) secret key
+void ed25519_publickey_ext_donna(const ed25519_secret_key sk, ed25519_public_key pk);
 
+/// Sign using extended secret key
 void ed25519_sign_ext_donna(const unsigned char *m, size_t mlen, const ed25519_secret_key sk, const ed25519_secret_key skext, ed25519_signature RS);
+
 
 /// Scalar multiplication with the provided basepoint
 void curve25519_scalarmult_donna(curved25519_key mypublic, const curved25519_key secret, const curved25519_key basepoint);

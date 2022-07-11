@@ -290,29 +290,22 @@ pub extern "C" fn curve25519_scalarmult(
 }
 
 
-/// Generate a public key using the expanded (`sk + sk_ext`) form of the secret key
+/// Generate a public key corresponding to the expanded form of the secret key
+/// NOTE: this uses the _non expanded_ secret key for derivation
 #[no_mangle]
 pub extern "C" fn ed25519_publickey_ext(
     sk: *mut SecretKey,
-    sk_ext: *mut SecretKey,
     pk: *mut PublicKey,
 ) {
-    let (sk, sk_ext, pk) = unsafe { (&(*sk), &(*sk_ext), &mut (*pk)) };
+    let (sk, pk) = unsafe { (&(*sk), &mut (*pk)) };
 
-    // Rebuild expanded key
-    let mut sk_full = [0u8; 64];
-    sk_full[..32].copy_from_slice(sk);
-    sk_full[32..].copy_from_slice(sk_ext);
+    let a = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(*sk);
 
-    let expanded = match ed25519_dalek::ExpandedSecretKey::from_bytes(&sk_full) {
-        Ok(v) => v,
-        Err(_e) => return,
-    };
+    let A = a * &ED25519_BASEPOINT_POINT;
 
-    // Generate public key
-    let public = ed25519_dalek::PublicKey::from(&expanded);
+    let c = A.compress();
 
-    pk.copy_from_slice(public.as_ref());
+    pk.copy_from_slice(c.as_bytes());
 }
 
 /// Generate a signature using the expanded (`sk + sk_ext`) form of the secret key.
